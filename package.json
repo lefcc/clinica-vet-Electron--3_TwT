@@ -1,0 +1,24 @@
+{
+  "name": "clinica-vet",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24.0.0 <25.0.0"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint eslint.config.mjs && pnpm -r lint",
+    "test": "pnpm -r test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm format:check"
+  },
+  "devDependencies": {
+    "eslint": "10.14.0",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2",
+    "vitest": "4.1.12"
+  }
+}

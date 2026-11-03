@@ -1,0 +1,10 @@
+packages:
+  - shared
+  - server
+  - desktop
+
+# O script recursivo nunca deve voltar a executar o script da raiz.
+includeWorkspaceRoot: false
+
+# Não acrescentar dependências diretas por resolução automática de peers.
+autoInstallPeers: false

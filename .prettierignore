@@ -1,0 +1,15 @@
+node_modules/
+**/node_modules/
+**/dist/
+**/out/
+**/coverage/
+**/release/
+pnpm-lock.yaml
+# README original da líder, fora do escopo de alteração da A1.
+README.md
+# Documentação de análise anterior: preservar o conteúdo e a formatação.
+AGENTS.md
+docs/PLANEJAMENTO-DEV1.md
+docs/PESQUISA-FERRAMENTAS.md
+docs/ANALISE-CONTEXTO-LEFCC.md
+docs/SKILLS-INSTALADAS.json
