@@ -1,5 +1,8 @@
 # A1 — Fundação do monorepo
 
+> Histórico da arquitetura anterior. A correção da A1 revisada da líder está em
+> [CORRECAO-A1-OFFLINE-FIRST.md](CORRECAO-A1-OFFLINE-FIRST.md): shared/app e MySQL dev.
+
 Responsável: Cir0Arruda, DEV 1 / Dev A. Referência: A1 de PROMPTS-SEMANA-1.md enviado pela lefcc.
 
 ## Entrega

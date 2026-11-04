@@ -1,0 +1,30 @@
+name: clinica-vet-dev
+
+# Somente sincronização em desenvolvimento. O banco operacional será SQLite
+# dentro do Electron; nenhum acesso à nuvem é configurado nesta etapa.
+services:
+  mysql:
+    image: mysql:8.4
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD no .env local}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-clinica_vet_dev}
+      MYSQL_USER: ${MYSQL_USER:-clinica_dev}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Defina MYSQL_PASSWORD no .env local}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql --protocol=TCP --host=127.0.0.1 --user="$$MYSQL_USER" --database="$$MYSQL_DATABASE" --execute="SELECT 1" --silent'
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  mysql_dev_data:

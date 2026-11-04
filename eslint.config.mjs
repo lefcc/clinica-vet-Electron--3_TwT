@@ -1,13 +1,12 @@
-// A1 autoriza somente eslint, typescript, prettier e vitest.
-// O parser padrão cobre os esqueletos export {} desta etapa.
-// Antes de adicionar anotações TS/TSX, adotar um parser TypeScript
-// explicitamente na tarefa correspondente; não ignorar arquivos tipados.
+// A1 revisada: quatro ferramentas diretas, sem parser/plugin adicional.
+// Os pontos de entrada vazios são válidos no parser padrão. Antes de código
+// TS/IPC real, propor e aprovar um parser TS na tarefa correspondente.
 export default [
   {
     ignores: ["**/node_modules/**", "**/dist/**", "**/out/**", "**/coverage/**", "**/release/**"],
   },
   {
-    files: ["**/*.{mjs,ts,tsx}"],
+    files: ["**/*.{mjs,ts}"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",

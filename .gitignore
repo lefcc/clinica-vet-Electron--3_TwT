@@ -24,6 +24,15 @@ playwright-report/
 .data/
 backups/
 *.dump
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+*.db-wal
+*.db-shm
 
 # Sistema operacional
 .DS_Store
