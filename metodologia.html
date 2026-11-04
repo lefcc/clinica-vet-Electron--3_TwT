@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<title>Metodologia de Desenvolvimento - Sistema Clínica Veterinária</title>
+<style>
+@page { size: A4; margin: 18mm 15mm; }
+body { font-family: "Segoe UI", Arial, sans-serif; color:#3b2f2a; font-size:10.5pt; line-height:1.45; }
+h1 { color:#fff; background:#2E7D32; padding:26px 20px; margin:0 0 14px; font-size:24pt; }
+h2 { color:#2E7D32; border-bottom:3px solid #6D4C41; padding-bottom:4px; margin-top:28px; page-break-after:avoid; }
+h3 { color:#6D4C41; margin-bottom:4px; page-break-after:avoid; }
+h4 { color:#2E7D32; margin:10px 0 2px; }
+table { border-collapse:collapse; width:100%; margin:8px 0; font-size:9.5pt; page-break-inside:avoid; }
+th { background:#6D4C41; color:#fff; text-align:left; padding:5px 7px; }
+td { border:1px solid #cdbfb2; padding:5px 7px; vertical-align:top; }
+tr:nth-child(even) td { background:#F7F3EC; }
+code, pre { background:#F7F3EC; border:1px solid #e0d6c8; border-radius:3px; font-family:Consolas, monospace; font-size:9pt; }
+code { padding:0 3px; }
+pre { padding:8px; white-space:pre-wrap; page-break-inside:avoid; }
+.box { border-left:5px solid #2E7D32; background:#eef6ee; padding:8px 12px; margin:10px 0; page-break-inside:avoid; }
+.warn { border-left-color:#8D6E63; background:#f4ece6; }
+.etapa { border:1px solid #cdbfb2; border-radius:6px; padding:8px 12px; margin:10px 0; page-break-inside:avoid; }
+.etapa b.t { color:#2E7D32; }
+.ok { color:#2E7D32; font-weight:bold; }
+.pb { page-break-before:always; }
+ul, ol { margin:4px 0 4px 20px; padding-left:8px; }
+.sub { color:#fff; background:#6D4C41; padding:6px 20px; margin:0 0 20px; }
+</style></head><body>
+
+<h1>Sistema para Clínica Veterinária</h1>
+<div class="sub">Metodologia de desenvolvimento com IA e guia de execução por desenvolvedor | Offline-First: Electron + TypeScript + IPC + SQLite + Sync MySQL | 4 devs, 30 dias</div>
+
+<h2>1. Objetivo e visão geral</h2>
+<p>O Will, dono da clínica, controla tudo em planilhas e caderno. O sistema substitui esses controles. Ele permite cadastrar clientes e animais, agendar consultas, registrar diagnósticos e histórico, controlar medicamentos e estoque com alarme, avisar sobre vacinas, comparar fornecedores (com cotação do dólar) e emitir o demonstrativo de custos do atendimento. A clínica terá <b>5 computadores</b> usando o sistema e <b>não pode parar quando a internet cair</b>.</p>
+
+<div class="box"><b>Fonte única de verdade:</b> o arquivo <code>AGENTS.md</code> na raiz do repositório governa todas as decisões técnicas e regras para agentes de IA. Em caso de dúvida, prevalece o <code>AGENTS.md</code>.</div>
+
+<h3>Requisitos confirmados com o Will e exigências do professor</h3>
+<table>
+<tr><th>Tema</th><th>Decisão</th></tr>
+<tr><td>Operação offline</td><td><b>O sistema funciona 100% sem internet.</b> O backend em TypeScript roda dentro do processo <code>main</code> do próprio Electron e grava no SQLite local. Queda de internet ou do banco em nuvem nunca trava o atendimento.</td></tr>
+<tr><td>Vários computadores</td><td><b>5 computadores / 5 usuários.</b> Cada PC opera no seu SQLite local e sincroniza em segundo plano (outbox push/pull) com o <b>MySQL 8 já existente em nuvem</b> quando há conexão.</td></tr>
+<tr><td>Tecnologia obrigatória</td><td><b>Electron + TypeScript estrito</b> (exigência do professor), front-end em <b>HTML + CSS + JS</b> (build Vite, sem frameworks) comunicando-se via <code>preload.ts</code> (<code>ipcRenderer</code> ↔ <code>ipcMain</code>) com a API em TypeScript do backend armazenada na mesma pasta de arquivos do software.</td></tr>
+<tr><td>Perfis</td><td>Cadastro de colaboradores. Três perfis: <b>MASTER</b> (admin), <b>VETERINARIO</b> e <b>ATENDENTE</b>. Sessão em memória no <code>main</code> (login funciona offline).</td></tr>
+<tr><td>Estoque</td><td>Alarme calculado pelas <b>saídas reais</b> (média diária dos últimos 30 dias). Quando restarem <b>3 dias ou menos</b>, dispara aviso de compra.</td></tr>
+<tr><td>Documento financeiro</td><td>Sem nota fiscal. Só o <b>Orçamento / Demonstrativo de atendimento</b> em PDF local (<code>printToPDF</code>), com itens, valores, total e "Documento sem valor fiscal".</td></tr>
+<tr><td>Vacinas</td><td>Aviso <b>3 dias antes</b> da próxima dose. WhatsApp <b>semiautomático</b> (botão abre conversa <code>wa.me</code> com mensagem pronta quando há internet; envio automático fica na fase 2).</td></tr>
+<tr><td>Visual e usabilidade</td><td>Verde (<code>#2E7D32</code>) e marrom (<code>#6D4C41</code>) sobre creme (<code>#F7F3EC</code>), interface simples, botões grandes, até 3 cliques para agendar consulta.</td></tr>
+</table>
+
+<h2>2. Arquitetura Offline-First</h2>
+<pre>
+┌──────────────────── PC da clínica (Electron) ────────────────────┐
+│  RENDERER (HTML + CSS + TS puro / Vite)                          │
+│     │  window.api.clientes.criar(dados)                          │
+│     ▼                                                            │
+│  PRELOAD (preload.ts) ── contextBridge + ipcRenderer.invoke      │
+│     │  canal "clientes:criar"                                    │
+│     ▼                                                            │
+│  MAIN = BACKEND TS (ipcMain.handle via registrarHandler)         │
+│     handler → service → repository                               │
+│     │                         │                                  │
+│     ▼                         ▼                                  │
+│  SQLite local           Motor de sincronização (sync_outbox)     │
+│  (sempre disponível)    push/pull a cada 60s e ao reconectar     │
+└───────────────────────────────┬──────────────────────────────────┘
+                                │ somente quando há internet (TLS)
+                                ▼
+                     MySQL 8 em nuvem (banco central)
+</pre>
+<table>
+<tr><th>Camada</th><th>Tecnologia</th><th>Responsabilidade</th></tr>
+<tr><td>Renderer (Front)</td><td>HTML + CSS (tokens próprios) + TS puro (Vite)</td><td>Telas, máscaras, validação visual, notificações. <b>Nunca acessa Node, banco, arquivos ou rede. Não decide regra de negócio.</b></td></tr>
+<tr><td>Ponte</td><td><code>preload.ts</code> (<code>contextBridge</code>)</td><td>Expõe apenas <code>window.api</code> com funções nomeadas mapeadas para canais IPC permitidos.</td></tr>
+<tr><td>Main (Backend)</td><td>Electron <code>main</code> + TypeScript + Drizzle + <code>node-cron</code></td><td>Sessão/perfis, validação Zod, regras de negócio, transações SQLite, jobs (alertas, dólar, vacinas, sync) e chamadas externas.</td></tr>
+<tr><td>Banco local</td><td>SQLite (<code>better-sqlite3</code>)</td><td>Leitura e escrita imediatas (WAL + <code>BEGIN IMMEDIATE</code>), tabelas de domínio + <code>sync_outbox</code> / <code>sync_estado</code> / <code>sync_conflitos</code>.</td></tr>
+<tr><td>Banco central</td><td>MySQL 8 em nuvem (<code>mysql2</code> + TLS)</td><td>Sincronização entre os 5 PCs e cópia central (InnoDB, <code>utf8mb4</code>, locks <code>FOR UPDATE</code>). Em dev local: Docker <code>mysql:8.4</code>.</td></tr>
+<tr><td>Compartilhado</td><td>Pasta <code>/shared</code> (Zod + tipos + canais IPC)</td><td>Contrato único importado por <code>main</code>, <code>preload</code> e <code>renderer</code>.</td></tr>
+</table>
+
+<h3>Estrutura do monorepo</h3>
+<pre>
+/clinica-vet
+  AGENTS.md, package.json, pnpm-workspace.yaml, tsconfig.base.json, docker-compose.yml (MySQL dev)
+  /shared/src       schemas Zod, tipos e mapa de canais IPC
+  /app/src
+    /main           main.ts + /backend/{ipc, modules, db/{local,central}, sync, auth, jobs, config}
+    /preload        preload.ts (contextBridge -> window.api)
+    /renderer       index.html, css/, ts/{pages, components/ui, layout, router, lib}
+  /docs             CONTEXTO.md, ESTADO.md, PROMPTS-SEMANA-1.md, metodologia.html, manual
+</pre>
+
+<h3>Perfis e permissões</h3>
+<table>
+<tr><th>Recurso</th><th>MASTER</th><th>VETERINARIO</th><th>ATENDENTE</th></tr>
+<tr><td>Colaboradores/usuários, configurações, backup, sync/conflitos, auditoria</td><td>Sim</td><td>Não</td><td>Não</td></tr>
+<tr><td>Financeiro e relatórios</td><td>Sim</td><td>Não</td><td>Orçamentos apenas</td></tr>
+<tr><td>Clientes e animais</td><td>Sim</td><td>Leitura</td><td>Sim</td></tr>
+<tr><td>Agenda</td><td>Toda</td><td>A própria</td><td>Cria e edita</td></tr>
+<tr><td>Consulta, diagnóstico e prontuário</td><td>Sim</td><td>Sim</td><td>Sem diagnóstico detalhado</td></tr>
+<tr><td>Medicamentos e estoque</td><td>Sim</td><td>Uso na consulta</td><td>Leitura</td></tr>
+<tr><td>Vacinas e lembretes</td><td>Sim</td><td>Aplicação</td><td>Lembretes</td></tr>
+</table>
+<div class="box warn"><b>Atenção:</b> a autorização é aplicada <b>em todo handler IPC no processo <code>main</code></b> via <code>registrarHandler</code>. O front apenas esconde menus, e isso nunca é segurança.</div>
+
+<h2 class="pb">3. Metodologia de trabalho com IA (anti-alucinação)</h2>
+<ol>
+<li><b>Uma tarefa = um objetivo = um resultado testável.</b> Exemplo: "criar o handler IPC <code>clientes:criar</code> com validação Zod e gravação na outbox". Nunca peça "faça o módulo de clientes inteiro".</li>
+<li><b>Contexto fixo.</b> Toda sessão usa o <code>AGENTS.md</code> (e/ou cola <code>docs/CONTEXTO.md</code>), o schema atual do banco e os contratos de <code>/shared</code>.</li>
+<li><b>Escopo fechado.</b> Termine o prompt com "ARQUIVOS PERMITIDOS: …" e "não instale dependências sem listar nome, motivo e link do npmjs.com e aguardar confirmação".</li>
+<li><b>Ordem fixa por módulo:</b> contrato Zod + canal IPC → schema/migration (local e central) → repository → service → handler IPC + preload → testes Vitest → tela HTML/CSS/TS.</li>
+<li><b>Contrato antes do código.</b> Front, preload e backend importam o mesmo schema de <code>@clinica/shared</code>.</li>
+<li><b>Regra de negócio só no <code>main</code>.</b> O <code>renderer</code> não calcula estoque, conflito de agenda, totais nem permissões.</li>
+<li><b>Validar sempre.</b> Após cada tarefa rode <code>pnpm -r typecheck</code>, <code>pnpm -r lint</code> e <code>pnpm -r test</code>.</li>
+<li><b>Commit pequeno e semântico.</b> Um commit por tarefa (<code>feat:</code>, <code>fix:</code>, <code>test:</code>, <code>chore:</code>). Se a IA errar, <code>git restore .</code> e refaça o prompt com escopo menor.</li>
+<li><b>Documento de estado e revisão humana.</b> Manter <code>docs/ESTADO.md</code> atualizado e revisar todo PR com outro dev antes do merge.</li>
+</ol>
+
+<h3>Modelo de prompt</h3>
+<pre>
+CONTEXTO: [AGENTS.md / colar CONTEXTO.md]
+SCHEMA ATUAL: [colar tabelas relevantes]
+CONTRATO: [colar Zod e canais IPC de /shared]
+TAREFA: Criar o handler IPC clientes:criar no módulo clientes.
+REGRAS: CPF único; apenas perfis MASTER e ATENDENTE; gravar cliente + sync_outbox na mesma transação SQLite.
+ARQUIVOS PERMITIDOS: app/src/main/backend/modules/clientes/{repository,service,clientes.test}.ts, app/src/main/backend/ipc/clientes.ipc.ts
+NÃO FAZER: não alterar migrations existentes, não instalar pacotes, não mudar outros módulos.
+SAÍDA ESPERADA: código completo dos arquivos + testes cobrindo sucesso/outbox, CPF duplicado e 3 perfis.
+</pre>
+
+<h3>Ritual semanal e definição de "pronto"</h3>
+<ul>
+<li><b>Ritual:</b> Segunda planejamento (30 min, contratos Zod) · Daily de 10 min · Quinta/Sexta integração, revisão cruzada e teste offline/online em 2 PCs · Sexta demo interna.</li>
+<li><b>Pronto quando:</b> compila sem erro, lint limpo, testes Vitest passando (incluindo os 3 perfis + sem sessão), funciona offline, grava na <code>sync_outbox</code>, mensagens em português e PR revisado.</li>
+</ul>
+
+<h2 class="pb">4. Divisão da equipe</h2>
+<table>
+<tr><th>Dev</th><th>Papel</th><th>Módulos e responsabilidades</th></tr>
+<tr><td><b>Dev A</b></td><td>Arquitetura, plataforma e sync</td><td>Monorepo, <code>main.ts</code>, <code>preload.ts</code>, registry IPC, SQLite local, MySQL central, ordem das migrations, <b>motor de sincronização e conflitos</b>, auth/sessão, colaboradores, auditoria, backup local, instalador NSIS e revisão de PRs.</td></tr>
+<tr><td><b>Dev B</b></td><td>Núcleo clínico</td><td>Clientes, animais, agenda, consultas/diagnóstico, histórico (linha do tempo), serviços/itens/orçamento e importação/exportação CSV.</td></tr>
+<tr><td><b>Dev C</b></td><td>Medicamentos e estoque</td><td>Medicamentos, fornecedores, lotes, movimentações, baixa de estoque na consulta (FEFO), cálculo de consumo/alertas, cotação do dólar e relatórios de estoque.</td></tr>
+<tr><td><b>Dev D</b></td><td>Experiência e comunicação</td><td>Design system em CSS + TS puro (<code>components/ui</code>), layout/roteador por perfil, indicador de sync, ViaCEP + <code>CepInput</code>, dashboard, vacinas, WhatsApp (<code>wa.me</code>), PDF de orçamento e UX.</td></tr>
+</table>
+
+<h2 class="pb">5. Semana 1: Fundação Offline-First (Dias 1–7)</h2>
+<p><b>Meta:</b> app abrindo 100% offline, login por perfil, design system CSS/TS, cadastros básicos gravando no SQLite + outbox e CEP com fallback manual.</p>
+
+<div class="etapa"><b class="t">Etapas 1.1 a 1.4 | Dev A | Dias 1-4 | Monorepo, Electron seguro, IPC, SQLite e Auth</b>
+<ol><li>Monorepo pnpm (<code>/shared</code>, <code>/app</code>), TS estrito, ESLint/Prettier e <code>docker-compose.yml</code> com MySQL 8.4 para dev.</li>
+<li>Contratos base em <code>/shared</code> (Perfil, RespostaIpc, Paginação, Login, Colaborador) e <code>registrarHandler</code> no <code>main</code> + <code>preload.ts</code> seguro.</li>
+<li>SQLite local (<code>better-sqlite3</code> + Drizzle) com WAL, <code>colaboradores</code>, <code>usuarios</code>, <code>clientes</code>, <code>animais</code> e tabelas <code>sync_outbox</code>, <code>sync_estado</code>, <code>sync_conflitos</code>.</li>
+<li>Login offline com <code>bcryptjs</code>, sessão em memória (8h), seed do primeiro MASTER e tela de login.</li></ol>
+<p class="ok">Pronto quando: sem internet, o usuário abre o app, faz login e vê seu nome/perfil; handlers bloqueiam perfis não autorizados.</p></div>
+
+<div class="etapa"><b class="t">Etapa 1.5 | Dev D | Dias 1-3 | Design system em CSS/TS puro e layout</b>
+<ol><li>Tokens CSS (<code>#2E7D32</code>, <code>#6D4C41</code>, <code>#F7F3EC</code>, fonte 16px) sem frameworks externos.</li>
+<li>Componentes em TS/DOM puro: Button, Input, Select, Textarea, Field, Table, Modal, ConfirmDialog, Toast, EmptyState e Spinner + catálogo <code>#/dev/componentes</code>.</li>
+<li>Layout com sidebar, topo (usuário, perfil, indicador de sync) e roteador SPA filtrando menus por perfil.</li></ol>
+<p class="ok">Pronto quando: todas as rotas navegam e o menu respeita os 3 perfis.</p></div>
+
+<div class="etapa"><b class="t">Etapa 1.6 | Dev B | Dias 2-5 | CRUD de clientes e animais</b>
+<ol><li>Contratos Zod + canais IPC de cliente e animal em <code>/shared</code>.</li>
+<li>Handlers IPC de clientes e animais (espécie, raça, sexo, peso, idade calculada, busca, paginação, exclusão lógica e escrita conjunta na <code>sync_outbox</code>).</li>
+<li>Telas de listagem, formulários e detalhe do cliente com seus animais.</li></ol>
+<p class="ok">Pronto quando: um cliente com 3 animais é criado, editado e buscado totalmente offline.</p></div>
+
+<div class="etapa"><b class="t">Etapa 1.7 | Dev D | Dias 3-5 | CEP automático com fallback offline</b>
+<ol><li>Handler <code>cep:buscar</code> no <code>main</code> consultando ViaCEP com timeout de 5s e erros tipados.</li>
+<li>Componente <code>CepInput</code> com máscara; sem internet, avisa o usuário e mantém o endereço editável.</li></ol>
+<p class="ok">Pronto quando: online preenche automático; offline permite digitar sem travar.</p></div>
+
+<div class="etapa"><b class="t">Etapas 1.8 e 1.9 | Dev C e Dev A | Dias 1-5 | Medicamentos, fornecedores e colaboradores</b>
+<ol><li>Dev C: contratos, migration SQLite, handlers IPC e telas de medicamentos (dias de alerta padrão 3, consumo inicial opcional) e fornecedores (nacional/importado).</li>
+<li>Dev A: CRUD de colaboradores (somente MASTER, proteção do último MASTER) e revisão cruzada da Semana 1.</li></ol>
+<p class="ok">Entrega da Semana 1: cadastros básicos e login funcionando offline com testes passando.</p></div>
+
+<h2 class="pb">6. Semana 2: Núcleo Clínico e Sincronização v1 (Dias 8–14)</h2>
+<p><b>Meta:</b> agendamento, consulta, prontuário, baixa de estoque local e sincronização push/pull com o MySQL em nuvem.</p>
+
+<div class="etapa"><b class="t">Etapas 2.1 e 2.2 | Dev A | Dias 1-5 | MySQL central e Motor de Sincronização v1</b>
+<ol><li>Schema Drizzle MySQL em paridade com o SQLite, conexão TLS ao MySQL em nuvem, credenciais via <code>safeStorage</code>.</li>
+<li>Job de Push (lê <code>sync_outbox</code> pendente e faz upsert idempotente no MySQL carimbando <code>sincronizado_em = NOW(6)</code>) e Pull (busca novidades por marca d'água sem regerar outbox), rodando a cada 60s e ao reconectar sem bloquear a UI.</li></ol>
+<p class="ok">Pronto quando: cadastrar offline num PC e reconectar faz o registro aparecer no segundo PC.</p></div>
+
+<div class="etapa"><b class="t">Etapas 2.3 a 2.5 | Dev B | Dias 1-5 | Agenda, consulta e histórico</b>
+<ol><li><code>agendamentos</code>: checagem local de conflito de horário por veterinário (até 3 cliques para agendar; offline sinaliza "não confirmado até sincronizar").</li>
+<li><code>consultas</code>: anamnese, peso, diagnóstico, prescrição e tratamento; handler omite diagnóstico para ATENDENTE.</li>
+<li>Histórico completo do animal em linha do tempo cronológica.</li></ol>
+<p class="ok">Pronto quando: veterinário registra consulta/diagnóstico e atendente não vê os campos restritos.</p></div>
+
+<div class="etapa"><b class="t">Etapas 2.6 e 2.7 | Dev C | Dias 1-5 | Lotes, movimentações e baixa na consulta</b>
+<ol><li>Tabelas <code>lotes</code> e <code>movimentacoes</code> (saldo sempre calculado pela soma).</li>
+<li>Baixa de medicamentos na consulta em transação única SQLite (<code>BEGIN IMMEDIATE</code>), consumindo por FEFO e bloqueando saldo local insuficiente.</li></ol>
+<p class="ok">Pronto quando: consulta baixa estoque por validade mais próxima e impede saldo local negativo.</p></div>
+
+<div class="etapa"><b class="t">Etapa 2.8 | Dev D | Dias 2-5 | Dashboard por perfil e indicador de sync</b>
+<ol><li>Cards reais por perfil (agenda do dia, alertas de estoque, vacinas próximas) e indicador no topo ("Sincronizado", "Pendentes: N", "Offline", "Conflitos: N").</li></ol>
+<p class="ok">Pronto quando: tela inicial reflete dados reais e mudanças de estado de rede/sync.</p></div>
+
+<h2 class="pb">7. Semana 3: Alertas, Vacinas, Dólar, Orçamento e Conflitos (Dias 15–21)</h2>
+<p><b>Meta:</b> todos os requisitos funcionais e resolução de conflitos de sincronização concluídos.</p>
+
+<div class="etapa"><b class="t">Etapas 3.1 e 3.2 | Dev A | Dias 1-5 | Conflitos de sincronização e auditoria</b>
+<ol><li>Detecção no push MySQL (com <code>SELECT ... FOR UPDATE</code>) para CPF duplicado, horário de agenda ocupado por outro PC, saldo global negativo e último MASTER, gravando em <code>sync_conflitos</code> + tela de resolução para o MASTER.</li>
+<li>Auditoria (quem, quando, antes/depois) em módulos críticos e testes automatizados com 2 bancos SQLite + 1 MySQL de teste.</li></ol></div>
+
+<div class="etapa"><b class="t">Etapas 3.3 a 3.5 | Dev C | Dias 1-5 | Alarme de 3 dias, fornecedores e dólar</b>
+<ol><li>Função pura <code>calcularDiasRestantes</code> (média de 30 dias; usa consumo inicial se &lt; 7 dias) + testes unitários.</li>
+<li>Job no <code>main</code> (ao abrir e a cada hora) gerando 1 alerta aberto por medicamento + sino e notificação nativa sem repetição.</li>
+<li>Vínculo medicamento-fornecedor (BRL/USD), busca AwesomeAPI no <code>main</code> com cache no banco para uso offline e comparativo nacional × importado.</li></ol></div>
+
+<div class="etapa"><b class="t">Etapas 3.6 e 3.7 | Dev D | Dias 1-4 | Vacinas e lembrete por WhatsApp</b>
+<ol><li>Catálogo <code>vacinas</code>, registro de <code>vacinacoes</code> com cálculo da próxima dose e lista dos próximos 3 dias.</li>
+<li><code>NotificadorWhatsApp</code> abrindo <code>https://wa.me/55...</code> pelo <code>main</code>, template editável pelo MASTER e registro em <code>lembretes_vacina</code> (offline mantém na fila pendente).</li></ol></div>
+
+<div class="etapa"><b class="t">Etapa 3.8 | Dev B | Dias 1-5 | Serviços, itens e orçamento</b>
+<ol><li>Catálogo de <code>servicos</code>, tabela <code>itens_atendimento</code> com valor unitário congelado, inclusão automática dos medicamentos usados na consulta e cálculo exato em centavos no <code>main</code>.</li></ol></div>
+
+<h2 class="pb">8. Semana 4: PDF, Relatórios, Instalador e Entrega (Dias 22–30)</h2>
+<p><b>Meta:</b> PDF sem valor fiscal, relatórios, backup local, instalador Windows testado offline e validação com o Will.</p>
+
+<div class="etapa"><b class="t">Etapas 4.1 a 4.3 | Dev D, Dev C e Dev B | Dias 1-4 | PDF, relatórios de estoque e CSV</b>
+<ol><li>Dev D (4.1): PDF de orçamento/demonstrativo via <code>printToPDF</code> ("Documento sem valor fiscal") + relatório de cobranças (MASTER).</li>
+<li>Dev C (4.2): Lista de compras sugerida (baseada nos alertas e melhor fornecedor) e relatório de validades, exportando PDF/CSV.</li>
+<li>Dev B (4.3): Importação CSV da planilha atual do Will (pré-visualização e erros por linha via diálogo do <code>main</code>) e exportação CSV compatível com Excel BR.</li></ol></div>
+
+<div class="etapa"><b class="t">Etapas 4.4 a 4.7 | Dev A, Dev D e Todos | Dias 1-5 | Backup local, instalador NSIS, UX e QA</b>
+<ol><li>Dev A (4.4 e 4.5): Backup automático local do arquivo SQLite + restauração testada; instalador Windows (<code>electron-builder</code> + NSIS com <code>better-sqlite3</code> reconstruído) validado em máquina limpa sem internet.</li>
+<li>Dev D (4.6): Polimento de UX, atalhos de teclado e teste de usabilidade com leigo.</li>
+<li>Todos (4.7): QA ponta a ponta nos 3 perfis (offline, online e reconectando em 2+ PCs), manual curto com capturas, README e entrega ao Will.</li></ol></div>
+
+<h2>9. Cronograma resumido (30 dias)</h2>
+<table>
+<tr><th>Semana</th><th>Dev A</th><th>Dev B</th><th>Dev C</th><th>Dev D</th></tr>
+<tr><td><b>1 (d1–7)</b></td><td>Monorepo, Electron/IPC, SQLite, auth, colaboradores</td><td>Clientes e animais</td><td>Medicamentos e fornecedores</td><td>Design system CSS/TS, layout, CEP</td></tr>
+<tr><td><b>2 (d8–14)</b></td><td>MySQL central e Sync v1 (push/pull)</td><td>Agenda, consulta, histórico</td><td>Lotes, movimentações, baixa FEFO</td><td>Dashboard e indicador de sync</td></tr>
+<tr><td><b>3 (d15–21)</b></td><td>Conflitos de sync, auditoria, testes sync</td><td>Serviços, itens e orçamento</td><td>Alertas (3 dias), dólar, comparativo</td><td>Vacinas e WhatsApp (<code>wa.me</code>)</td></tr>
+<tr><td><b>4 (d22–30)</b></td><td>Backup local, instalador <code>.exe</code>, integração</td><td>Importação/exportação CSV</td><td>Relatórios de estoque/compras</td><td>PDF de orçamento e UX</td></tr>
+</table>
+
+<h2>10. Riscos e mitigação</h2>
+<table>
+<tr><th>Risco</th><th>Mitigação</th></tr>
+<tr><td>Complexidade da sincronização offline ↔ MySQL</td><td>UUID gerado no PC, exclusão lógica obrigatória, <code>sync_outbox</code> transacional idempotente, sync v1 simples na Semana 2 e conflitos na Semana 3 com apoio ao Dev A.</td></tr>
+<tr><td>Conflito offline (mesmo horário na agenda ou mesmo estoque)</td><td>Revalidação no push ao MySQL com <code>SELECT ... FOR UPDATE</code>, registro em <code>sync_conflitos</code> e tela para o MASTER/atendente resolver sem perder dados.</td></tr>
+<tr><td>Módulo nativo <code>better-sqlite3</code> no Electron</td><td>Uso de <code>@electron/rebuild</code> e teste do instalador NSIS em máquina limpa antes dos últimos dias.</td></tr>
+<tr><td>Credenciais do MySQL nos PCs</td><td>Guardadas somente no <code>main</code> com <code>safeStorage</code>, TLS obrigatório, usuário MySQL sem permissão de <code>DROP</code>/<code>DELETE</code> e allowlist de IP.</td></tr>
+<tr><td>IA gerar código fora do padrão</td><td><code>AGENTS.md</code> na raiz, contratos Zod antes do código, prompts de escopo fechado e revisão humana obrigatória em todo PR.</td></tr>
+</table>
+
+<h2>11. Primeiros passos imediatos (Dia 1)</h2>
+<table>
+<tr><th>Dev</th><th>Faça hoje</th></tr>
+<tr><td><b>A</b></td><td>Criar monorepo (<code>/shared</code>, <code>/app</code>), Docker MySQL de dev, contratos base em <code>/shared</code> e esqueleto seguro do Electron com <code>preload.ts</code> e <code>registrarHandler</code>.</td></tr>
+<tr><td><b>B</b></td><td>Escrever contratos Zod + canais IPC de <code>Cliente</code> e <code>Animal</code> em <code>/shared</code> e alinhar com A e D.</td></tr>
+<tr><td><b>C</b></td><td>Escrever contratos Zod + canais IPC de <code>Medicamento</code> e <code>Fornecedor</code> em <code>/shared</code>.</td></tr>
+<tr><td><b>D</b></td><td>Criar tokens CSS (verde/marrom/creme) e iniciar componentes base em TS puro (<code>Button</code>, <code>Input</code>, <code>Table</code>, <code>Modal</code>).</td></tr>
+</table>
+</body></html>
