@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checklist de Validação — Clínica Veterinária</title>
+<style>
+  :root {
+    --bg: #f4f1eb;
+    --surface: #ffffff;
+    --surface-2: #faf8f4;
+    --text: #292522;
+    --muted: #746d66;
+    --brown: #6D4C41;
+    --brown-2: #8D6E63;
+    --green: #2E7D32;
+    --green-2: #4E7A3A;
+    --border: #e5ded5;
+    --shadow: 0 8px 28px rgba(54, 39, 30, .07);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  header {
+    background: linear-gradient(120deg, var(--brown), var(--brown-2));
+    color: white; padding: 34px 20px 28px;
+  }
+  .header-inner, main { max-width: 1050px; margin: 0 auto; }
+  .eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: .75rem; opacity: .85; font-weight: 700; }
+  h1 { margin: 8px 0 6px; font-size: clamp(1.55rem, 4vw, 2.25rem); line-height: 1.15; }
+  header p { margin: 0; opacity: .9; }
+  main { padding: 22px 16px 60px; }
+  .toolbar {
+    position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap;
+    align-items: center; gap: 12px; background: rgba(244,241,235,.96);
+    backdrop-filter: blur(10px); padding: 12px 0; margin-bottom: 16px;
+  }
+  .progress-card {
+    flex: 1 1 240px; min-width: 220px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+  }
+  .progress-top { display:flex; justify-content:space-between; gap:10px; font-size:.9rem; font-weight:650; }
+  .track { height: 8px; background: #e9e4dc; border-radius: 99px; overflow:hidden; margin-top:8px; }
+  .fill { height:100%; width:0%; background:var(--green); transition:width .2s ease; }
+  button {
+    border: 0; border-radius: 10px; padding: 11px 16px; cursor:pointer;
+    font: inherit; font-weight:700; transition: transform .12s, opacity .12s;
+  }
+  button:active { transform: scale(.98); }
+  .save { background: var(--green); color:white; }
+  .secondary { background: white; color: var(--brown); border:1px solid var(--border); }
+  .status { flex-basis:100%; min-height: 20px; color:var(--green); font-size:.86rem; }
+  .intro {
+    color:var(--muted); font-size:.92rem; margin: 0 0 18px;
+    background:#fffdf9; border-left:4px solid var(--green-2); padding:12px 14px; border-radius:0 9px 9px 0;
+  }
+  .section {
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    box-shadow:var(--shadow); margin:14px 0; overflow:hidden;
+  }
+  .section h2 {
+    margin:0; padding:15px 18px; background:var(--surface-2);
+    color:var(--brown); font-size:1.08rem; border-bottom:1px solid var(--border);
+  }
+  .section h3 { margin:16px 18px 5px; color:var(--brown-2); font-size:.96rem; }
+  .items { padding: 8px 18px 15px; }
+  label.item {
+    display:flex; align-items:flex-start; gap:11px; padding:9px 2px;
+    border-bottom:1px solid #f0ece6; cursor:pointer;
+  }
+  label.item:last-child { border-bottom:0; }
+  label.item:hover { background:#fcfbf8; }
+  input[type="checkbox"] {
+    appearance:none; -webkit-appearance:none; flex:0 0 20px; width:20px; height:20px;
+    border:2px solid #aaa096; border-radius:5px; margin:2px 0 0;
+    display:grid; place-items:center; cursor:pointer; background:white;
+  }
+  input[type="checkbox"]:checked { background:var(--green); border-color:var(--green); }
+  input[type="checkbox"]:checked::after { content:"✓"; color:white; font-size:14px; font-weight:900; line-height:1; }
+  input[type="checkbox"]:focus-visible, button:focus-visible { outline:3px solid #a5c99d; outline-offset:3px; }
+  .item span { flex:1; }
+  .item input:checked + span { color:#77716a; text-decoration:line-through; text-decoration-thickness:1px; }
+  .subheading { margin:15px 0 3px; font-size:.9rem; font-weight:750; color:var(--brown-2); }
+  .notes, .result {
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:18px; margin-top:14px; box-shadow:var(--shadow);
+  }
+  .notes label { display:block; font-weight:700; margin-bottom:8px; }
+  textarea, input[type="text"], input[type="date"] {
+    width:100%; border:1px solid var(--border); border-radius:9px; padding:10px 12px;
+    font:inherit; color:var(--text); background:#fff;
+  }
+  textarea { min-height:90px; resize:vertical; }
+  .meta { display:grid; grid-template-columns:2fr 1fr; gap:12px; margin-top:12px; }
+  .result h2 { margin:0 0 12px; color:var(--brown); font-size:1.05rem; }
+  .result-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .metric { background:var(--surface-2); border-radius:10px; padding:12px; }
+  .metric strong { display:block; color:var(--green); font-size:1.35rem; }
+  .metric span { color:var(--muted); font-size:.82rem; }
+  footer { text-align:center; color:var(--muted); font-size:.82rem; padding:24px 12px; }
+  @media(max-width:600px) {
+    .toolbar { position:static; }
+    .meta, .result-grid { grid-template-columns:1fr; }
+    .toolbar button { flex:1; }
+  }
+  @media print {
+    body { background:white; }
+    header { padding:18px; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+    .toolbar { position:static; }
+    .toolbar button, .status { display:none; }
+    .section, .notes, .result { box-shadow:none; break-inside:avoid; }
+    label.item { break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <div class="eyebrow">Projeto DAD</div>
+    <h1>Checklist de validação</h1>
+    <p>Sistema de Gestão para Clínica Veterinária</p>
+  </div>
+</header>
+<main>
+  <div class="toolbar">
+    <div class="progress-card">
+      <div class="progress-top"><span>Progresso da conferência</span><span id="percent">0%</span></div>
+      <div class="track"><div class="fill" id="progress"></div></div>
+      <div style="font-size:.8rem;color:#746d66;margin-top:5px" id="counter">0 de 0 requisitos atendidos</div>
+    </div>
+    <button class="save" id="saveBtn" type="button">💾 Salvar marcações</button>
+    <button class="secondary" id="printBtn" type="button">Imprimir</button>
+    <button class="secondary" id="resetBtn" type="button">Limpar checklist</button>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+  </div>
+
+  <p class="intro"><strong>Como usar:</strong> marque os requisitos conforme realizar os testes e clique em <strong>Salvar marcações</strong>. Ao reabrir este arquivo no mesmo navegador e dispositivo, as marcações salvas serão recuperadas automaticamente. Marque um item como atendido somente depois de testar seu funcionamento real.</p>
+
+  <div id="checklist"></div>
+
+  <section class="result">
+    <h2>Resultado da validação</h2>
+    <div class="result-grid">
+      <div class="metric"><strong id="totalMetric">0</strong><span>Total de requisitos</span></div>
+      <div class="metric"><strong id="doneMetric">0</strong><span>Requisitos atendidos</span></div>
+      <div class="metric"><strong id="pendingMetric">0</strong><span>Requisitos pendentes</span></div>
+    </div>
+    <div class="meta">
+      <div><label for="responsavel">Responsável pela validação</label><input id="responsavel" type="text" placeholder="Nome do responsável"></div>
+      <div><label for="data">Data</label><input id="data" type="date"></div>
+    </div>
+    <div style="margin-top:14px">
+      <label for="conclusao" style="display:block;font-weight:700;margin-bottom:7px">Conclusão</label>
+      <select id="conclusao" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px;font:inherit;background:white">
+        <option value="">Selecione uma opção</option>
+        <option>Sistema atende a todos os requisitos</option>
+        <option>Sistema atende parcialmente aos requisitos</option>
+        <option>Sistema não atende aos requisitos do projeto</option>
+      </select>
+    </div>
+  </section>
+
+  <section class="notes">
+    <label for="observacoes">Observações</label>
+    <textarea id="observacoes" placeholder="Registre aqui problemas encontrados, testes realizados ou requisitos que precisam de ajustes..."></textarea>
+  </section>
+</main>
+<footer>Checklist baseado nos requisitos do documento do Projeto DAD.</footer>
+
+<script>
+const sections = [
+  { title: "1. Gestão de colaboradores e permissões", items: [
+    "O sistema permite cadastrar e gerenciar colaboradores.",
+    "Existem três perfis de acesso: MASTER, VETERINARIO e ATENDENTE.",
+    "O controle de acesso funciona localmente.",
+    "As permissões são sincronizadas entre os computadores.",
+    "As permissões são aplicadas diretamente no backend.",
+    "O sistema mantém uma trilha de auditoria das operações."
+  ]},
+  { title: "2. Gestão de tutores e animais", items: [
+    "É possível cadastrar tutores com seus dados completos.",
+    "É possível vincular vários animais a um mesmo tutor (relação 1:N).",
+    "O sistema permite exclusão lógica de registros, preservando o histórico.",
+    "O cadastro do animal contém espécie.",
+    "O cadastro do animal contém raça.",
+    "O cadastro do animal contém sexo.",
+    "O cadastro do animal contém data de nascimento.",
+    "A idade do animal é calculada automaticamente.",
+    "O cadastro do animal contém peso."
+  ]},
+  { title: "3. Consulta automática de endereço (ViaCEP)", items: [
+    "O sistema integra com a API do ViaCEP.",
+    "A consulta é executada pelo processo principal (main).",
+    "Ao inserir um CEP, os dados do endereço são preenchidos automaticamente.",
+    "Os campos de endereço continuam editáveis manualmente.",
+    "O cadastro de endereço funciona manualmente quando não há internet."
+  ]},
+  { title: "4. Agendamento e prontuário médico digital", items: [
+    "O sistema permite gerenciar agendas de atendimento.",
+    "Existe verificação de conflitos de horário por veterinário.",
+    "O histórico clínico é centralizado por animal.",
+    "O prontuário permite registrar anamnese.",
+    "O prontuário permite registrar diagnósticos.",
+    "Os diagnósticos são restritos aos perfis VETERINARIO e MASTER.",
+    "O prontuário permite registrar observações veterinárias.",
+    "O prontuário permite registrar prescrições de medicamentos."
+  ]},
+  { title: "5. Controle de estoque e fornecedores", items: [
+    "É possível cadastrar fornecedores nacionais.",
+    "É possível cadastrar fornecedores importados.",
+    "O sistema controla o estoque de medicamentos.",
+    "O sistema controla o estoque de vacinas.",
+    "O estoque é organizado por lotes.",
+    "O sistema utiliza o método FEFO (primeiro que vence, primeiro que sai).",
+    "O saldo de estoque é calculado pela soma das movimentações.",
+    "Existe um algoritmo de alerta de estoque crítico.",
+    "O alerta é baseado no consumo médio diário real.",
+    "O cálculo considera uma reserva mínima de 3 dias de operação."
+  ]},
+  { title: "6. Integração financeira e cotação de moedas", items: [
+    "O sistema integra com a AwesomeAPI para consultar a cotação do dólar.",
+    "A cotação USD-BRL possui cache local.",
+    "A cotação armazenada pode ser utilizada quando o sistema estiver offline.",
+    "O sistema permite atualizar e comparar custos de insumos importados.",
+    "É possível gerar demonstrativos em PDF.",
+    "É possível gerar orçamentos em PDF sem valor fiscal.",
+    "O sistema gera relatórios de faturamento dos atendimentos.",
+    "Os valores financeiros são armazenados e calculados em centavos exatos."
+  ]},
+  { title: "7. Automação de lembretes de imunização", items: [
+    "Existe uma verificação agendada de vacinas próximas do vencimento.",
+    "A antecedência de alerta é configurada para 3 dias.",
+    "O sistema permite disparar lembretes semiautomáticos via WhatsApp.",
+    "A integração utiliza links wa.me.",
+    "As mensagens seguem um padrão predefinido.",
+    "O sistema registra o envio dos lembretes."
+  ]},
+  { title: "8. Interface e identidade visual (UI/UX)", items: [
+    "A interface é ágil e intuitiva.",
+    "A interface é responsiva.",
+    "O agendamento de uma consulta pode ser realizado em no máximo 3 cliques.",
+    "A interface utiliza a cor marrom #6D4C41.",
+    "A interface utiliza a cor marrom #8D6E63.",
+    "A interface utiliza o fundo creme #F7F3EC.",
+    "A interface utiliza o verde #2E7D32.",
+    "A interface utiliza o verde #4E7A3A.",
+    "Existe contraste adequado entre textos e elementos.",
+    "Os botões possuem tamanho adequado.",
+    "Os campos e botões apresentam foco visível.",
+    "A interface facilita a leitura e minimiza erros de preenchimento."
+  ]},
+  { title: "9. Plataforma e arquitetura técnica", groups: [
+    { title: "9.1. Plataforma desktop", items: [
+      "O sistema utiliza Electron.",
+      "O projeto utiliza TypeScript em modo estrito.",
+      "Front-end e backend são empacotados juntos.",
+      "A aplicação é instalada por meio de instalador Windows NSIS.",
+      "O empacotamento utiliza electron-builder."
+    ]},
+    { title: "9.2. Interface (Renderer)", items: [
+      "O front-end utiliza HTML.",
+      "O front-end utiliza CSS com design tokens próprios.",
+      "O front-end utiliza JavaScript/TypeScript puro.",
+      "A estruturação utiliza Vite.",
+      "O projeto não utiliza React.",
+      "O projeto não utiliza Tailwind.",
+      "contextIsolation está definido como true.",
+      "sandbox está definido como true.",
+      "nodeIntegration está definido como false."
+    ]},
+    { title: "9.3. Comunicação IPC e ponte segura", items: [
+      "Existe um arquivo preload.ts.",
+      "O preload utiliza contextBridge.",
+      "A comunicação utiliza ipcRenderer.invoke.",
+      "O preload expõe window.api ao front-end.",
+      "O backend em TypeScript está no processo main.",
+      "A comunicação do backend utiliza ipcMain.handle.",
+      "Não existe dependência de servidor HTTP externo.",
+      "O front-end mantém comunicação com o backend mesmo sem internet."
+    ]},
+    { title: "9.4. Contratos e validação", items: [
+      "Existe um pacote compartilhado /shared.",
+      "O projeto utiliza schemas Zod.",
+      "Todas as entradas são validadas.",
+      "Todas as saídas são validadas.",
+      "Todos os canais IPC são validados."
+    ]}
+  ]},
+  { title: "10. Persistência e sincronização de dados", groups: [
+    { title: "10.1. Banco de dados local", items: [
+      "O sistema utiliza SQLite.",
+      "O SQLite utiliza better-sqlite3.",
+      "O banco é gerenciado pelo Drizzle ORM.",
+      "O banco local funciona independentemente da internet.",
+      "A operação offline funciona em cada computador."
+    ]},
+    { title: "10.2. Banco de dados em nuvem", items: [
+      "O sistema utiliza MySQL 8 em nuvem.",
+      "A conexão utiliza mysql2.",
+      "O banco utiliza Drizzle ORM.",
+      "A conexão utiliza TLS.",
+      "Os dados são sincronizados automaticamente em segundo plano.",
+      "Existe uma fila transacional sync_outbox.",
+      "A sincronização implementa operações push e pull.",
+      "Existe tratamento de conflitos por meio de sync_conflitos.",
+      "A sincronização acontece quando a conexão com a internet está disponível."
+    ]}
+  ]},
+  { title: "11. Integrações externas e utilitários", items: [
+    "A integração com o ViaCEP funciona corretamente.",
+    "A integração com a AwesomeAPI funciona corretamente.",
+    "A cotação USD-BRL possui cache local.",
+    "A integração com WhatsApp utiliza links https://wa.me/.",
+    "Os links wa.me são validados no processo main.",
+    "O sistema utiliza node-cron para agendamentos automáticos.",
+    "As senhas são protegidas utilizando bcryptjs.",
+    "Os PDFs são gerados nativamente por meio de printToPDF.",
+    "O projeto possui testes automatizados utilizando Vitest."
+  ]},
+  { title: "12. Funcionamento geral e arquitetura integrada", items: [
+    "O front-end se comunica com o preload.ts.",
+    "O preload se comunica com o backend por IPC.",
+    "O backend se comunica com o SQLite local.",
+    "O SQLite permanece ativo independentemente da internet.",
+    "O sistema sincroniza os dados com o MySQL em nuvem quando está online.",
+    "Os dados permanecem disponíveis durante quedas de internet.",
+    "A sincronização não interrompe o atendimento.",
+    "O sistema suporta o cenário previsto de 5 computadores/usuários."
+  ]}
+];
+
+const STORAGE_KEY = "checklist_clinica_veterinaria_projeto_dad_v1";
+const root = document.getElementById("checklist");
+let allCheckboxes = [];
+
+function addItems(container, items, prefix) {
+  items.forEach((item, index) => {
+    const id = prefix + "-" + index;
+    const label = document.createElement("label");
+    label.className = "item";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.id = id;
+    checkbox.dataset.key = id;
+    const text = document.createElement("span");
+    text.textContent = item;
+    label.append(checkbox, text);
+    container.appendChild(label);
+    allCheckboxes.push(checkbox);
+    checkbox.addEventListener("change", updateProgress);
+  });
+}
+
+sections.forEach((section, i) => {
+  const card = document.createElement("section");
+  card.className = "section";
+  const heading = document.createElement("h2");
+  heading.textContent = section.title;
+  card.appendChild(heading);
+
+  if (section.groups) {
+    section.groups.forEach((group, j) => {
+      const sub = document.createElement("h3");
+      sub.textContent = group.title;
+      card.appendChild(sub);
+      const items = document.createElement("div");
+      items.className = "items";
+      addItems(items, group.items, "s" + i + "g" + j);
+      card.appendChild(items);
+    });
+  } else {
+    const items = document.createElement("div");
+    items.className = "items";
+    addItems(items, section.items, "s" + i);
+    card.appendChild(items);
+  }
+  root.appendChild(card);
+});
+
+function updateProgress() {
+  const done = allCheckboxes.filter(c => c.checked).length;
+  const total = allCheckboxes.length;
+  const percent = total ? Math.round(done / total * 100) : 0;
+  document.getElementById("percent").textContent = percent + "%";
+  document.getElementById("progress").style.width = percent + "%";
+  document.getElementById("counter").textContent = `${done} de ${total} requisitos atendidos`;
+  document.getElementById("totalMetric").textContent = total;
+  document.getElementById("doneMetric").textContent = done;
+  document.getElementById("pendingMetric").textContent = total - done;
+}
+
+function collectData() {
+  const checks = {};
+  allCheckboxes.forEach(c => checks[c.dataset.key] = c.checked);
+  return {
+    checks,
+    responsavel: document.getElementById("responsavel").value,
+    data: document.getElementById("data").value,
+    conclusao: document.getElementById("conclusao").value,
+    observacoes: document.getElementById("observacoes").value
+  };
+}
+
+function saveData(showMessage = true) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(collectData()));
+    if (showMessage) {
+      const now = new Date().toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"});
+      document.getElementById("status").textContent = "✓ Salvo neste navegador às " + now + ".";
+    }
+  } catch (error) {
+    document.getElementById("status").textContent = "Não foi possível salvar. Verifique as permissões de armazenamento do navegador.";
+  }
+}
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    allCheckboxes.forEach(c => c.checked = Boolean(data.checks && data.checks[c.dataset.key]));
+    document.getElementById("responsavel").value = data.responsavel || "";
+    document.getElementById("data").value = data.data || "";
+    document.getElementById("conclusao").value = data.conclusao || "";
+    document.getElementById("observacoes").value = data.observacoes || "";
+    document.getElementById("status").textContent = "✓ Últimas marcações salvas foram carregadas.";
+  } catch (error) {
+    document.getElementById("status").textContent = "Não foi possível recuperar os dados salvos.";
+  }
+  updateProgress();
+}
+
+document.getElementById("saveBtn").addEventListener("click", () => saveData(true));
+document.getElementById("printBtn").addEventListener("click", () => window.print());
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if (!confirm("Tem certeza de que deseja apagar todas as marcações e informações salvas?")) return;
+  allCheckboxes.forEach(c => c.checked = false);
+  ["responsavel", "data", "conclusao", "observacoes"].forEach(id => document.getElementById(id).value = "");
+  localStorage.removeItem(STORAGE_KEY);
+  updateProgress();
+  document.getElementById("status").textContent = "Checklist limpo. Clique em Salvar marcações para gravar o estado atual.";
+});
+
+loadData();
+updateProgress();
+</script>
+</body>
+</html>

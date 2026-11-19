@@ -1,4 +1,2 @@
-import { z } from "zod";
-
-export const PerfilSchema = z.enum(["MASTER", "VETERINARIO", "ATENDENTE"]);
-export type Perfil = z.infer<typeof PerfilSchema>;
+// Tipos de perfil do sistema
+export type Perfil = 'MASTER' | 'VETERINARIO' | 'ATENDENTE';

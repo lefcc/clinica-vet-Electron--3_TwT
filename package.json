@@ -1,25 +1,26 @@
 {
   "name": "clinica-vet",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
-  "type": "module",
-  "packageManager": "pnpm@11.25.0",
-  "engines": {
-    "node": ">=24.0.0 <25.0.0"
-  },
+  "description": "Sistema desktop offline-first para clínica veterinária",
   "scripts": {
+    "dev": "pnpm --filter app dev",
+    "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "lint": "eslint eslint.config.mjs && pnpm -r lint",
+    "lint": "pnpm -r lint",
     "test": "pnpm -r test",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm format:check"
+    "db:generate": "pnpm --filter app db:generate",
+    "db:migrate": "pnpm --filter app db:migrate",
+    "db:push": "pnpm --filter app db:push",
+    "db:studio": "pnpm --filter app db:studio"
   },
   "devDependencies": {
-    "eslint": "10.14.0",
-    "prettier": "3.9.10",
-    "typescript": "6.0.3",
-    "typescript-eslint": "8.73.0",
-    "vitest": "4.1.12"
-  }
+    "marked": "^18.2.1",
+    "puppeteer": "^25.18.1",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@9.6.0"
 }

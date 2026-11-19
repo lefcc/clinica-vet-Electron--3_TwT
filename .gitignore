@@ -1,40 +1,49 @@
-# Dependências e ferramentas
+# Dependencies
 node_modules/
 .pnpm-store/
-*.tsbuildinfo
-*.log
 
-# Artefatos gerados
+# Build outputs
 dist/
-out/
-release/
-coverage/
-test-results/
-playwright-report/
+build/
+*.tsbuildinfo
 
-# Segredos: somente modelos podem ser versionados
+# Electron
+app/dist/
+app/build/
+app/release/
+
+# Environment files
 .env
-.env.*
-!.env.example
-!.env.*.example
-*.pem
-*.key
+.env.local
+.env.*.local
+!/.env.example
 
-# Banco, backups e dados locais
-.data/
-backups/
-*.dump
-*.sqlite
-*.sqlite3
-*.sqlite-wal
-*.sqlite-shm
-*.sqlite3-wal
-*.sqlite3-shm
-*.db
-*.db-wal
-*.db-shm
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Sistema operacional
+# OS
 .DS_Store
 Thumbs.db
-Desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Docker
+.docker/
+
+# Misc
+*.tmp
+*.temp

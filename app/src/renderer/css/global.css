@@ -1,0 +1,107 @@
+/* Estilos Globais - Clínica Veterinária */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: var(--tamanho-fonte-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--fonte-base);
+  font-size: var(--tamanho-fonte-base);
+  font-weight: var(--peso-fonte-normal);
+  line-height: 1.5;
+  color: var(--cor-texto);
+  background-color: var(--cor-fundo);
+  min-height: 100vh;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tipografia */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: var(--peso-fonte-negrito);
+  line-height: 1.3;
+  color: var(--cor-texto);
+}
+
+h1 { font-size: var(--tamanho-fonte-titulo); }
+h2 { font-size: calc(var(--tamanho-fonte-titulo) * 0.9); }
+h3 { font-size: calc(var(--tamanho-fonte-titulo) * 0.8); }
+
+/* Links */
+a {
+  color: var(--cor-primaria);
+  text-decoration: none;
+  transition: color var(--transicao-rapida);
+}
+
+a:hover {
+  color: var(--cor-primaria-hover);
+  text-decoration: underline;
+}
+
+/* Botões base */
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+/* Inputs base */
+input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* Utilitários */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Foco visível para acessibilidade */
+:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cor-fundo);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cor-borda);
+  border-radius: var(--raio-borda-redondo);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cor-texto-claro);
+}

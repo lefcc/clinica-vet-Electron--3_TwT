@@ -1,0 +1,66 @@
+/* Design Tokens - Identidade Visual Clínica Veterinária */
+:root {
+  /* Cores principais */
+  --cor-primaria: #2E7D32;
+  --cor-primaria-hover: #4E7A3A;
+  --cor-primaria-clara: #E8F5E9;
+
+  --cor-secundaria: #6D4C41;
+  --cor-secundaria-hover: #8D6E63;
+  --cor-secundaria-clara: #EFEBE9;
+
+  /* Cores de fundo e texto */
+  --cor-fundo: #F7F3EC;
+  --cor-fundo-claro: #FFFFFF;
+  --cor-texto: #3B2F2A;
+  --cor-texto-claro: #6D5A4F;
+  --cor-borda: #D7CCC8;
+
+  /* Cores de estado */
+  --cor-sucesso: #2E7D32;
+  --cor-sucesso-clara: #E8F5E9;
+  --cor-aviso: #F57F17;
+  --cor-aviso-clara: #FFF8E1;
+  --cor-erro: #C62828;
+  --cor-erro-clara: #FBE9E7;
+  --cor-info: #1565C0;
+  --cor-info-clara: #E3F2FD;
+
+  /* Tipografia */
+  --fonte-base: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --tamanho-fonte-base: 16px;
+  --tamanho-fonte-pequeno: 14px;
+  --tamanho-fonte-grande: 18px;
+  --tamanho-fonte-titulo: 24px;
+  --peso-fonte-normal: 400;
+  --peso-fonte-medio: 500;
+  --peso-fonte-negrito: 600;
+
+  /* Espaçamento */
+  --espacamento-xs: 4px;
+  --espacamento-sm: 8px;
+  --espacamento-md: 16px;
+  --espacamento-lg: 24px;
+  --espacamento-xl: 32px;
+
+  /* Bordas */
+  --raio-borda-pequeno: 4px;
+  --raio-borda-medio: 8px;
+  --raio-borda-grande: 12px;
+  --raio-borda-redondo: 50%;
+
+  /* Sombras */
+  --sombra-pequena: 0 1px 3px rgba(59, 47, 42, 0.12);
+  --sombra-media: 0 4px 12px rgba(59, 47, 42, 0.15);
+  --sombra-grande: 0 8px 24px rgba(59, 47, 42, 0.18);
+
+  /* Transições */
+  --transicao-rapida: 150ms ease;
+  --transicao-normal: 250ms ease;
+
+  /* Z-index */
+  --z-dropdown: 100;
+  --z-modal: 200;
+  --z-toast: 300;
+  --z-tooltip: 400;
+}
