@@ -1,10 +1,10 @@
-// A1 revisada: quatro ferramentas diretas, sem parser/plugin adicional.
-// Os pontos de entrada vazios são válidos no parser padrão. Antes de código
-// TS/IPC real, propor e aprovar um parser TS na tarefa correspondente.
+import tseslint from "typescript-eslint";
+
 export default [
   {
     ignores: ["**/node_modules/**", "**/dist/**", "**/out/**", "**/coverage/**", "**/release/**"],
   },
+  ...tseslint.configs.recommended,
   {
     files: ["**/*.{mjs,ts}"],
     languageOptions: {
