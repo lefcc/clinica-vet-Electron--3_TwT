@@ -1,0 +1,15 @@
+packages:
+  - shared
+  - app
+
+# O script recursivo nunca deve voltar a executar o script da raiz.
+includeWorkspaceRoot: false
+
+# Não acrescentar dependências diretas por resolução automática de peers.
+autoInstallPeers: false
+
+# Dependência transitiva do Vitest; só o instalador do binário nativo é permitido.
+allowBuilds:
+  esbuild: true
+engineStrict: true
+saveExact: true

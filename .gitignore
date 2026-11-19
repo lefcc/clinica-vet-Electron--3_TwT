@@ -1,0 +1,40 @@
+# Dependências e ferramentas
+node_modules/
+.pnpm-store/
+*.tsbuildinfo
+*.log
+
+# Artefatos gerados
+dist/
+out/
+release/
+coverage/
+test-results/
+playwright-report/
+
+# Segredos: somente modelos podem ser versionados
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# Banco, backups e dados locais
+.data/
+backups/
+*.dump
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+*.db-wal
+*.db-shm
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+Desktop.ini
