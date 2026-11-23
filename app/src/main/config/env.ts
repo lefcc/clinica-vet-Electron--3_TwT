@@ -1,14 +1,13 @@
 // Configuração de ambiente - carregamento de variáveis
 import * as path from 'path';
+import * as dotenv from 'dotenv';
 import { app } from 'electron';
 
-// Carregar .env se existir (desenvolvimento)
+// carrega o .env (padrão da aula, com dotenv). procura na pasta do app e na raiz do projeto.
+// se o arquivo não existir, tudo bem: valem os valores padrão logo abaixo
 if (process.env.NODE_ENV !== 'production') {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require('dotenv').config({ path: path.join(process.cwd(), '.env') });
-  } catch {
-    // dotenv não instalado ou .env não encontrado - ignorar
+  for (const pasta of [process.cwd(), path.resolve(process.cwd(), '..')]) {
+    dotenv.config({ path: path.join(pasta, '.env') });
   }
 }
 
@@ -41,6 +40,14 @@ interface Config {
   // Segurança
   bcryptCost: number;
   sessionTtlHours: number;
+
+  // usuário inicial (opcional): se o .env não definir, em desenvolvimento vale o de exemplo
+  usuarioExemplo: {
+    login?: string;
+    senha?: string;
+    nome?: string;
+    cpf?: string;
+  };
 }
 
 function getEnv(key: string, defaultValue?: string): string {
@@ -97,5 +104,12 @@ export const config: Config = {
   },
 
   bcryptCost: getEnvNumber('BCRYPT_COST', 10),
-  sessionTtlHours: getEnvNumber('SESSION_TTL_HOURS', 8)
+  sessionTtlHours: getEnvNumber('SESSION_TTL_HOURS', 8),
+
+  usuarioExemplo: {
+    login: process.env.SEED_MASTER_LOGIN,
+    senha: process.env.SEED_MASTER_SENHA,
+    nome: process.env.SEED_MASTER_NOME,
+    cpf: process.env.SEED_MASTER_CPF
+  }
 };
