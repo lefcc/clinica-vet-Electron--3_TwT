@@ -9,7 +9,7 @@ export default [
     ignores: ['src/**/*.test.ts'],
     languageOptions: {
       parserOptions: {
-        project: './tsconfig.json',
+        project: ['./tsconfig.json', './tsconfig.renderer.json'],
       },
     },
     rules: {
