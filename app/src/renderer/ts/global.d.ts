@@ -1,4 +1,4 @@
-// Declarações de tipos globais para o renderer
+// avisa o typescript que existe window.api (criado pelo preload)
 interface ElectronAPI {
   invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
 }

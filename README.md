@@ -96,6 +96,62 @@ pnpm --filter app db:migrate -- --config=drizzle.config.mysql.ts
 pnpm dev
 ```
 
+## Rodando só o app (front + login de exemplo) no Windows
+
+Passo a passo testado para abrir o app sem MySQL/Docker. Só precisa do Node 20+.
+
+**1. Instalar o pnpm 9.6.0 de verdade** (o `npx pnpm` não serve, porque os scripts chamam `pnpm` por dentro):
+
+```powershell
+npm i -g pnpm@9.6.0
+```
+
+Feche e abra o terminal e confira com `pnpm -v` (tem que mostrar `9.6.0`). Com o pnpm 12 o projeto quebra.
+
+**2. Instalar as dependências**, na pasta raiz (onde está o `pnpm-workspace.yaml`):
+
+```powershell
+pnpm install
+```
+
+Se terminar sem erro, vá para o passo 4. Se der `ELIFECYCLE` em `better-sqlite3` (aparece "Could not find any Visual Studio installation"), é porque o `postinstall` tenta compilar o SQLite e a máquina não tem o compilador C++. Siga o passo 3.
+
+**3. (Só se o passo 2 falhou) baixar o binário pronto do SQLite**, em vez de compilar:
+
+```powershell
+pnpm install --ignore-scripts
+cd app
+node node_modules/electron/install.js
+node -e "console.log(require('electron/package.json').version); console.log(path.dirname(require.resolve('better-sqlite3/package.json')))"
+```
+
+A saída tem duas linhas: a versão do Electron (ex.: `30.5.1`) e o caminho do `better-sqlite3`. Entre nessa pasta e baixe o binário, trocando `VERSAO` e `CAMINHO` pelo que saiu:
+
+```powershell
+cd "CAMINHO"
+npx prebuild-install --runtime=electron --target=VERSAO --arch=x64
+```
+
+Depois volte para a pasta `app`. A alternativa é instalar o Visual Studio Build Tools com a carga "Desenvolvimento para desktop com C++" e rodar `pnpm install` de novo.
+
+**4. Abrir o app:**
+
+```powershell
+pnpm --filter "@clinica-vet/app" dev
+```
+
+(ou `pnpm dev` dentro da pasta `app`). O script se chama `dev`, não `start`.
+
+**Login de exemplo:** em desenvolvimento, ao abrir o app o arquivo `app/src/main/db/local/seed-usuario-exemplo.ts` cria um usuário MASTER de exemplo no SQLite local. O login e a senha estão nesse arquivo. Para usar outros, copie `.env.example` para `.env` e preencha as variáveis `SEED_MASTER_*`. O app empacotado não cria usuário nenhum.
+
+**Problemas comuns**
+
+| Mensagem | O que fazer |
+| --- | --- |
+| `'pnpm' não é reconhecido` | Rodar o passo 1 e reabrir o terminal |
+| `ELIFECYCLE` em `better-sqlite3` | Passo 3 |
+| `No handler registered for ...` no terminal | Normal: esses módulos do back-end ainda não existem, a tela avisa |
+
 ## Scripts Disponíveis
 
 ```bash

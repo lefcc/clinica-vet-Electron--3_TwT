@@ -1,22 +1,30 @@
-// Registry de handlers IPC com verificação de perfil
+// registry de handlers IPC: confere sessão e perfil antes de chamar a função
 import { ipcMain, IpcMainInvokeEvent } from 'electron';
+import { ErroNegocio } from '../erros/erro-negocio';
+import { SessaoEmMemoria } from '../modules/auth/sessao-em-memoria';
+import type { Perfil, SessaoAtiva } from '../modules/auth/tipos';
 
-export type PerfilPermitido = 'MASTER' | 'VETERINARIO' | 'ATENDENTE';
+export type PerfilPermitido = Perfil;
+export type Sessao = SessaoAtiva;
 
-export interface Sessao {
-  usuarioId: string;
-  perfil: PerfilPermitido;
-  expiraEm: number;
-}
-
-let sessaoAtual: Sessao | null = null;
+// a sessão fica só na memória do main (some quando o app fecha)
+export const sessoes = new SessaoEmMemoria();
 
 export function definirSessao(sessao: Sessao | null) {
-  sessaoAtual = sessao;
+  sessoes.definir(sessao);
 }
 
 export function obterSessao(): Sessao | null {
-  return sessaoAtual;
+  return sessoes.obter();
+}
+
+// transforma o erro no formato { ok: false, erro } que o front espera
+function erroParaResposta(error: unknown) {
+  if (error instanceof ErroNegocio) {
+    return { ok: false, erro: { codigo: error.codigo, mensagem: error.message } };
+  }
+  const mensagem = error instanceof Error ? error.message : 'Erro interno do servidor';
+  return { ok: false, erro: { codigo: 'ERRO_INTERNO', mensagem } };
 }
 
 export function registrarHandler<TEntrada, TSaida>(
@@ -25,25 +33,27 @@ export function registrarHandler<TEntrada, TSaida>(
   handler: (event: IpcMainInvokeEvent, dados: TEntrada) => Promise<TSaida>
 ) {
   ipcMain.handle(canal, async (event, dados: TEntrada) => {
-    // Verificar sessão
-    if (!sessaoAtual) {
+    const sessao = obterSessao();
+
+    // tem alguém logado?
+    if (!sessao) {
       return {
         ok: false,
         erro: { codigo: 'NAO_AUTENTICADO', mensagem: 'Sessão expirada ou inválida. Faça login novamente.' }
       };
     }
 
-    // Verificar expiração
-    if (Date.now() > sessaoAtual.expiraEm) {
-      sessaoAtual = null;
+    // a sessão já venceu?
+    if (Date.now() > sessao.expiraEm) {
+      definirSessao(null);
       return {
         ok: false,
         erro: { codigo: 'SESSAO_EXPIRADA', mensagem: 'Sessão expirada. Faça login novamente.' }
       };
     }
 
-    // Verificar perfil
-    if (!perfisPermitidos.includes(sessaoAtual.perfil)) {
+    // o perfil dessa pessoa pode usar esse canal?
+    if (!perfisPermitidos.includes(sessao.perfil)) {
       return {
         ok: false,
         erro: { codigo: 'SEM_PERMISSAO', mensagem: 'Você não tem permissão para realizar esta ação.' }
@@ -54,12 +64,12 @@ export function registrarHandler<TEntrada, TSaida>(
       const resultado = await handler(event, dados);
       return { ok: true, dados: resultado };
     } catch (error) {
-      const mensagem = error instanceof Error ? error.message : 'Erro interno do servidor';
-      return { ok: false, erro: { codigo: 'ERRO_INTERNO', mensagem } };
+      return erroParaResposta(error);
     }
   });
 }
 
+// canal que não exige login (ex.: o próprio login)
 export function registrarHandlerPublico<TEntrada, TSaida>(
   canal: string,
   handler: (event: IpcMainInvokeEvent, dados: TEntrada) => Promise<TSaida>
@@ -69,8 +79,7 @@ export function registrarHandlerPublico<TEntrada, TSaida>(
       const resultado = await handler(event, dados);
       return { ok: true, dados: resultado };
     } catch (error) {
-      const mensagem = error instanceof Error ? error.message : 'Erro interno do servidor';
-      return { ok: false, erro: { codigo: 'ERRO_INTERNO', mensagem } };
+      return erroParaResposta(error);
     }
   });
 }
