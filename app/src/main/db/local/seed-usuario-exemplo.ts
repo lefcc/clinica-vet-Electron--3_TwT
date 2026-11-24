@@ -1,5 +1,8 @@
 import type { HashSenha } from '../../modules/auth/hash-senha';
 import type { RepositorioUsuarios } from '../../modules/auth/usuario.repository';
+import { CpfSchema, LoginEntradaSchema, NomeSchema } from '@clinica-vet/shared';
+
+const contaInicialSchema = LoginEntradaSchema.extend({ nome: NomeSchema, cpf: CpfSchema });
 
 export interface DadosUsuarioExemplo {
   login: string;
@@ -38,9 +41,13 @@ export class SeedUsuarioExemplo {
     if (this.usuarios.contar() > 0) return 'ja-existia';
     if (!dados) return 'sem-dados';
     if (dados.senha.length < 8) throw new Error('A senha do usuário de exemplo precisa ter pelo menos 8 caracteres.');
+    if (Buffer.byteLength(dados.senha, 'utf8') > 72) throw new Error('A senha do administrador local deve ter no máximo 72 bytes.');
 
-    const senhaHash = await this.hash.gerar(dados.senha);
-    this.usuarios.criar({ nome: dados.nome, cpf: dados.cpf, cargo: 'Administrador', login: dados.login, senhaHash, perfil: 'MASTER' });
+    const conta = contaInicialSchema.safeParse(dados);
+    if (!conta.success) throw new Error('Confira o login, o nome e o CPF do administrador local.');
+    const { senha, ...cadastro } = conta.data;
+    const senhaHash = await this.hash.gerar(senha);
+    this.usuarios.criar({ ...cadastro, cargo: 'Administrador', senhaHash, perfil: 'MASTER' });
     return 'criado';
   }
 

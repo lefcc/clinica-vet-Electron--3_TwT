@@ -64,19 +64,24 @@ export function montarShell(raiz: HTMLElement, sessao: SessaoUi, aoSair: () => v
   const contador = el('span', 'sino__contador');
   contador.hidden = true;
   const sino = el('a', 'sino', [criarIcone('sino', 20), contador], { href: '#/estoque', 'aria-label': 'Alertas de estoque', title: 'Alertas de estoque' });
+  let consultaSync = 0;
 
   // atualiza a etiqueta de sincronização (offline é só aviso)
   async function atualizarSync(): Promise<void> {
+    const consulta = ++consultaSync;
     if (!navigator.onLine) {
       definirSync('offline', 'Offline — dados salvos neste computador');
       return;
     }
     const resposta = await api.invoke<EstadoSync>('sync:estado');
+    if (consulta !== consultaSync || !navigator.onLine) return;
     if (!resposta.ok) return definirSync('erro', 'Sincronização com problema');
     const { estado, pendentes } = resposta.dados;
     if (estado === 'erro') definirSync('erro', 'Sincronização com problema');
-    else if (estado === 'sincronizando' || pendentes > 0) definirSync('pendente', `${pendentes} pendente${pendentes === 1 ? '' : 's'} de envio`);
-    else definirSync('ok', 'Sincronizado');
+    else if (estado === 'sincronizando') definirSync('pendente', 'Sincronizando…');
+    else if (pendentes > 0) definirSync('pendente', `${pendentes} pendente${pendentes === 1 ? '' : 's'} de envio`);
+    else if (estado === 'sincronizado') definirSync('ok', 'Envios em dia');
+    else definirSync('pendente', 'Modo local');
   }
 
   // número de alertas no sino (some se for zero)
@@ -128,6 +133,7 @@ export function montarShell(raiz: HTMLElement, sessao: SessaoUi, aoSair: () => v
       }
     },
     parar() {
+      consultaSync++;
       window.clearInterval(relogio);
       window.removeEventListener('online', atualizarTudo);
       window.removeEventListener('offline', atualizarTudo);

@@ -9,6 +9,7 @@ O workspace `shared` concentra os schemas Zod e os tipos públicos consumidos pe
 | Configurações | `configuracoes:obter`, `atualizar` | MASTER. Os demais perfis podem ler apenas o modelo de lembrete. |
 | Backup local | `backup:listar`, `criar`, `restaurar` | MASTER |
 | Conflitos de sync | `sync_conflitos:listar`, `resolver` | MASTER |
+| Indicador de sync | `sync:estado` | Todos os perfis autenticados |
 
 O SQLite cria 25 tabelas no boot, incluindo as 3 tabelas exclusivas de sincronização local. O schema central declara as 22 tabelas correspondentes. As datas com horário no SQLite usam segundos UTC, conforme o Drizzle existente. Validade e próxima dose são datas de calendário. Valores monetários são inteiros em centavos.
 
@@ -17,6 +18,8 @@ Alterações administrativas gravam dados, auditoria e pendências de sincroniza
 Os backups ficam em `backups` dentro da pasta de dados do aplicativo. O backup automático roda a partir do horário configurado de São Paulo enquanto o app está aberto, uma vez por dia, mesmo se a retenção tiver removido a cópia automática anterior. A restauração cria uma cópia preventiva, valida o arquivo antes de substituir o banco, preserva a auditoria local e encerra a sessão para que o operador entre com uma conta do banco restaurado.
 
 A escolha LOCAL conserva o registro atual e enfileira seu envio novamente. A escolha CENTRAL aplica a versão central do mesmo registro e descarta as pendências substituídas. A resolução fica registrada na auditoria. A detecção automática de novos conflitos e a importação de alterações por pull continuam como trabalho separado da interface de resolução.
+
+O indicador consulta as pendências diretamente no SQLite. Quando a conexão volta, ele diferencia modo local, fila pendente, falha e envios confirmados pelo MySQL. Uma tentativa que falha mantém a fila em ordem para a próxima execução. O envio automático, o pull e os canais ainda ausentes estão registrados na [varredura offline](AUDITORIA-OFFLINE.md).
 
 ## Validação
 

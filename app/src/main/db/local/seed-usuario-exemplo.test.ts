@@ -49,6 +49,17 @@ describe('SeedUsuarioExemplo', () => {
     await expect(new SeedUsuarioExemplo(repo, hash).executar({ ...USUARIO_EXEMPLO, senha: '1234567' })).rejects.toThrow(/8 caracteres/);
   });
 
+  it('preserva a senha, normaliza o login e recusa valores que tornariam a conta inicial inutilizável', async () => {
+    const repo = new RepositorioFalso();
+    const seed = new SeedUsuarioExemplo(repo, hash);
+    await expect(seed.executar({ ...USUARIO_EXEMPLO, senha: 'á'.repeat(37) })).rejects.toThrow(/72 bytes/);
+    await expect(seed.executar({ ...USUARIO_EXEMPLO, login: '  ' })).rejects.toThrow(/login/);
+    expect(repo.criados).toHaveLength(0);
+    await seed.executar({ ...USUARIO_EXEMPLO, login: '  master  ', senha: ' senha local ' });
+    expect(repo.criados[0]?.login).toBe('master');
+    expect(await hash.comparar(' senha local ', repo.criados[0]?.senhaHash ?? '')).toBe(true);
+  });
+
   it('escolherDados: o .env manda; sem .env só em desenvolvimento usa o exemplo', () => {
     expect(SeedUsuarioExemplo.escolherDados({ senha: 'outra-senha-forte', login: 'will' }, false)).toMatchObject({ login: 'will', senha: 'outra-senha-forte' });
     expect(SeedUsuarioExemplo.escolherDados({}, true)).toEqual(USUARIO_EXEMPLO);

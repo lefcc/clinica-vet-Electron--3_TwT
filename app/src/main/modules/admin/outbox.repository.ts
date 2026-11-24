@@ -5,6 +5,12 @@ export type OperacaoOutbox = 'inserir' | 'atualizar' | 'inativar';
 export class OutboxRepository {
   constructor(private readonly banco: BancoSql) {}
 
+  contarPendencias(): number {
+    const linha = this.banco.prepare('SELECT COUNT(*) AS total FROM sync_outbox WHERE enviado_em IS NULL')
+      .get() as { total: number };
+    return linha.total;
+  }
+
   enfileirar(tabela: string, id: string, operacao: OperacaoOutbox, dados: object): void {
     this.banco.prepare(
       'INSERT INTO sync_outbox (tabela, registro_id, operacao, dados) VALUES (?, ?, ?, ?)'

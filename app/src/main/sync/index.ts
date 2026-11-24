@@ -1,11 +1,12 @@
 // Módulo de sincronização - outbox, push, pull, conflitos
-import { getLocalDb } from '../db/local/client';
+import { getLocalDb, obterConexaoLocal } from '../db/local/client';
 import { runInTransaction } from '../db/central/client';
 import { config } from '../config/env';
 import { z } from 'zod';
 import type { RowDataPacket } from 'mysql2/promise';
 import { colunasSincronizaveis } from '../db/local/tabelas-sincronizaveis';
 import { agoraEmSegundos } from '../modules/admin/transacao';
+import { OutboxRepository } from '../modules/admin/outbox.repository';
 
 export interface SyncStatus {
   pendentes: number;
@@ -31,9 +32,7 @@ function atualizarStatus(parcial: Partial<SyncStatus>) {
 }
 
 export async function contarPendentes(): Promise<number> {
-  const db = getLocalDb();
-  const resultado = db.prepare('SELECT COUNT(*) as total FROM sync_outbox WHERE enviado_em IS NULL').get() as { total: number };
-  return resultado.total;
+  return new OutboxRepository(obterConexaoLocal()).contarPendencias();
 }
 
 export async function executarPush(): Promise<{ enviados: number; erros: number }> {
@@ -66,7 +65,7 @@ export async function executarPush(): Promise<{ enviados: number; erros: number 
     for (const item of pendentes) {
       try {
         await pushItem(item);
-        db.prepare('UPDATE sync_outbox SET enviado_em = ?, tentativas = tentativas + 1 WHERE id = ?')
+        db.prepare('UPDATE sync_outbox SET enviado_em = ?, tentativas = tentativas + 1, ultimo_erro = NULL WHERE id = ?')
           .run(agoraEmSegundos(), item.id);
         enviados++;
       } catch {
@@ -74,10 +73,16 @@ export async function executarPush(): Promise<{ enviados: number; erros: number 
         const mensagem = 'Não foi possível enviar o registro ao banco central.';
         db.prepare('UPDATE sync_outbox SET tentativas = tentativas + 1, ultimo_erro = ? WHERE id = ?')
           .run(mensagem, item.id);
+        atualizarStatus({ erro: mensagem });
+        // Um envio mais novo pode depender deste ou atualizar o mesmo registro.
+        break;
       }
     }
 
-    atualizarStatus({ ultimaSync: Date.now(), pendentes: await contarPendentes() });
+    atualizarStatus({
+      pendentes: await contarPendentes(),
+      ...(enviados > 0 && erros === 0 && { ultimaSync: Date.now() })
+    });
     return { enviados, erros };
   } catch (error) {
     const mensagem = error instanceof Error ? error.message : 'Erro na sincronização';

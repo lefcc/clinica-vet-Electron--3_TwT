@@ -60,8 +60,15 @@ export function criarTrilha1(conexao: ConexaoLocal, hash: HashSenha) {
   return { colaboradores, auditoria, configuracoes, backup, conflitos };
 }
 
-export function registrarTrilha1(services: ReturnType<typeof criarTrilha1>): void {
+export function registrarTrilha1(
+  services: ReturnType<typeof criarTrilha1>, emSincronizacao: () => boolean = () => false
+): void {
   const { colaboradores, auditoria, configuracoes, backup, conflitos } = services;
+  const exigirFilaDisponivel = () => {
+    if (emSincronizacao()) {
+      throw new ErroNegocio('SYNC_EM_ANDAMENTO', 'Aguarde a sincronização atual terminar e tente novamente.');
+    }
+  };
   registrar('colaboradores:listar', master, (dados) => colaboradores.listar(dados));
   registrar('colaboradores:obter', master, ({ id }) => colaboradores.obter(id));
   registrar('colaboradores:criar', master, (dados, sessao) => colaboradores.criar(dados, sessao, () => exigirSessaoAtual(sessao)));
@@ -85,12 +92,16 @@ export function registrarTrilha1(services: ReturnType<typeof criarTrilha1>): voi
   registrar('backup:listar', master, () => backup.listar());
   registrar('backup:criar', master, (_dados, sessao) => backup.criar(sessao));
   registrar('backup:restaurar', master, async ({ id }, sessao) => {
-    await backup.restaurar(id, sessao, () => exigirSessaoAtual(sessao));
+    await backup.restaurar(id, sessao, () => {
+      exigirSessaoAtual(sessao);
+      exigirFilaDisponivel();
+    });
     return {};
   });
 
   registrar('sync_conflitos:listar', master, () => conflitos.listar());
   registrar('sync_conflitos:resolver', master, ({ id, escolha }, sessao) => {
+    exigirFilaDisponivel();
     conflitos.resolver(id, escolha, sessao);
     return {};
   });

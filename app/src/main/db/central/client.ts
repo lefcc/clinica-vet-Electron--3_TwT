@@ -16,6 +16,7 @@ export function getCentralPool(): mysql.Pool {
     ssl: config.mysql.ssl ? { rejectUnauthorized: false } : undefined,
     waitForConnections: true,
     connectionLimit: 10,
+    connectTimeout: 5000,
     queueLimit: 0,
     charset: 'utf8mb4',
     timezone: '+00:00'
@@ -35,9 +36,12 @@ export async function testCentralConnection(): Promise<boolean> {
   try {
     const pool = getCentralPool();
     const connection = await pool.getConnection();
-    await connection.ping();
-    connection.release();
-    return true;
+    try {
+      await connection.ping();
+      return true;
+    } finally {
+      connection.release();
+    }
   } catch {
     return false;
   }

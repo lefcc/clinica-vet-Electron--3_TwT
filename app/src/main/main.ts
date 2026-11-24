@@ -8,10 +8,13 @@ import { SeedUsuarioExemplo } from './db/local/seed-usuario-exemplo';
 import { AuthIpc } from './ipc/auth.ipc';
 import { permitirOrigemIpc, sessoes } from './ipc/registry';
 import { criarTrilha1, registrarTrilha1 } from './ipc/trilha1.ipc';
+import { registrarEstadoSync } from './ipc/sync.ipc';
+import { OutboxRepository } from './modules/admin/outbox.repository';
 import { runInTransaction } from './modules/admin/transacao';
 import { AuthService } from './modules/auth/auth.service';
 import { HashSenha } from './modules/auth/hash-senha';
 import { UsuarioRepository } from './modules/auth/usuario.repository';
+import { getSyncStatus } from './sync';
 
 class Aplicacao {
   async iniciar(): Promise<void> {
@@ -22,7 +25,10 @@ class Aplicacao {
     await app.whenReady();
 
     // primeiro o banco (e o usuário de exemplo), depois a janela com a tela de login
-    await this.prepararBanco();
+    if (!(await this.prepararBanco())) {
+      app.quit();
+      return;
+    }
     this.criarJanela();
 
     app.on('activate', () => {
@@ -35,7 +41,7 @@ class Aplicacao {
 
   // abre o banco, cria as tabelas, garante o usuário de exemplo e liga os canais de login.
   // se der erro, avisa com um dialog nativo (igual na aula) em vez de quebrar em silêncio
-  private async prepararBanco(): Promise<void> {
+  private async prepararBanco(): Promise<boolean> {
     try {
       const conexao = obterConexaoLocal();
       new EsquemaLocal(conexao).aplicar();
@@ -45,6 +51,10 @@ class Aplicacao {
 
       const dados = SeedUsuarioExemplo.escolherDados(config.usuarioExemplo, !app.isPackaged);
       const resultado = await new SeedUsuarioExemplo(usuarios, hash).executar(dados);
+      if (resultado === 'sem-dados') {
+        dialog.showErrorBox('Primeiro acesso', 'Configure a conta do administrador local antes de iniciar o aplicativo.');
+        return false;
+      }
       console.log(`Banco local pronto (usuário de exemplo: ${resultado}).`);
 
       const trilha1 = criarTrilha1(conexao, hash);
@@ -58,17 +68,20 @@ class Aplicacao {
         })
       });
       new AuthIpc(auth).registrar();
-      registrarTrilha1(trilha1);
+      registrarTrilha1(trilha1, () => getSyncStatus().emAndamento);
+      registrarEstadoSync(new OutboxRepository(conexao), getSyncStatus);
       const backupAgendado = () => void trilha1.backup.executarAgendado().catch(() => {
         console.error('Não foi possível executar o backup automático.');
       });
       const cronometro = setInterval(backupAgendado, 60_000);
       app.once('before-quit', () => clearInterval(cronometro));
       backupAgendado();
+      return true;
     } catch (erro) {
       const detalhe = erro instanceof Error ? erro.message : String(erro);
       console.error('Erro ao preparar o banco local:', detalhe);
       dialog.showErrorBox('Erro com o banco de dados', `Não foi possível preparar o banco local.\n\nDetalhes: ${detalhe}`);
+      return false;
     }
   }
 

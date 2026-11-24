@@ -28,7 +28,7 @@ export function paginaSchema<T extends z.ZodTypeAny>(item: T) {
 export const SessaoSchema = z.object({ usuarioId: IdSchema, nome: NomeSchema, perfil: PerfilSchema, expiraEm: z.number().int().positive() }).strict();
 export type Sessao = z.infer<typeof SessaoSchema>;
 export const LoginEntradaSchema = z.object({ login: z.string().trim().min(1).max(60), senha: z.string().min(1).max(200) }).strict();
-export const EstadoSyncSchema = z.object({ estado: z.enum(['sincronizado', 'sincronizando', 'erro']), pendentes: z.number().int().nonnegative(), ultimo_sync_em: DataUtcSchema.optional() });
+export const EstadoSyncSchema = z.object({ estado: z.enum(['local', 'sincronizado', 'sincronizando', 'erro']), pendentes: z.number().int().nonnegative(), ultimo_sync_em: DataUtcSchema.optional() }).strict();
 export type EstadoSync = z.infer<typeof EstadoSyncSchema>;
 export const EnderecoSchema = z.object({ cep: CepSchema, logradouro: z.string(), bairro: z.string(), cidade: z.string(), uf: UfSchema });
 export type Endereco = z.infer<typeof EnderecoSchema>;

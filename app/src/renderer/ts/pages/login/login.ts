@@ -26,6 +26,7 @@ export function montarLogin(raiz: HTMLElement, aoEntrar: (sessao: Sessao) => voi
 
   // confere os campos, pergunta ao back-end e entra
   async function enviar(): Promise<void> {
+    if (entrar.disabled) return;
     campoLogin.definirErro();
     campoSenha.definirErro();
     erro.hidden = true;
@@ -34,6 +35,7 @@ export function montarLogin(raiz: HTMLElement, aoEntrar: (sessao: Sessao) => voi
 
     entrar.disabled = true;
     const r = await api.invoke<Sessao>('auth:login', { login: login.value.trim(), senha: senha.value });
+    if (!form.isConnected) return;
     entrar.disabled = false;
     // errou: mostra o erro e limpa a senha
     if (!r.ok) {

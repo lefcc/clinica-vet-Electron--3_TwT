@@ -6,9 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConexaoLocal } from '../db/local/conexao-local';
 import { EsquemaLocal } from '../db/local/esquema-local';
 import { HashSenha } from '../modules/auth/hash-senha';
+import { OutboxRepository } from '../modules/admin/outbox.repository';
 import { UsuarioRepository } from '../modules/auth/usuario.repository';
 import { permitirOrigemIpc, sessoes } from './registry';
 import { criarTrilha1, registrarTrilha1 } from './trilha1.ipc';
+import { registrarEstadoSync } from './sync.ipc';
+import type { SyncStatus } from '../sync';
 
 type Resposta = { ok: true; dados: unknown } | { ok: false; erro: { codigo: string; mensagem: string } };
 const evento = { sender: { id: 1, mainFrame: {} }, senderFrame: {} };
@@ -30,6 +33,7 @@ describe('Trilha 1 via registry IPC e SQLite', () => {
   let masterId: string;
   let destruir: () => void;
   let services: ReturnType<typeof criarTrilha1>;
+  let enviando: boolean;
 
   beforeEach(async () => {
     pasta = mkdtempSync(join(tmpdir(), 'clinica-trilha1-'));
@@ -42,7 +46,8 @@ describe('Trilha 1 via registry IPC e SQLite', () => {
     permitirOrigemIpc(1, (remover) => { destruir = remover; });
     autenticar();
     services = criarTrilha1(banco, hash);
-    registrarTrilha1(services);
+    enviando = false;
+    registrarTrilha1(services, () => enviando);
   });
 
   afterEach(() => {
@@ -73,6 +78,29 @@ describe('Trilha 1 via registry IPC e SQLite', () => {
   function contar(tabela: 'auditoria' | 'sync_outbox' | 'colaboradores') {
     return (banco.prepare('SELECT COUNT(*) AS total FROM ' + tabela).get() as { total: number }).total;
   }
+
+  it('consulta o estado local da fila sem MySQL e sem confundir uma fila vazia com sincronização', async () => {
+    const estado: SyncStatus = { pendentes: 0, ultimaSync: null, emAndamento: false, erro: null };
+    registrarEstadoSync(new OutboxRepository(banco), () => estado);
+    expect(await invocar('sync:estado')).toEqual({ ok: true, dados: { estado: 'local', pendentes: 0 } });
+    await sucesso('configuracoes:atualizar', { nome_clinica: 'Clínica offline' });
+    autenticar('ATENDENTE');
+    expect(await invocar('sync:estado')).toEqual({ ok: true, dados: { estado: 'local', pendentes: 2 } });
+    estado.erro = 'erro interno do MySQL';
+    expect(await invocar('sync:estado')).toEqual({ ok: true, dados: { estado: 'erro', pendentes: 2 } });
+    estado.erro = null;
+    estado.emAndamento = true;
+    expect(await invocar('sync:estado')).toEqual({ ok: true, dados: { estado: 'sincronizando', pendentes: 2 } });
+    banco.prepare('UPDATE sync_outbox SET enviado_em = 1760000000').run();
+    estado.emAndamento = false;
+    estado.ultimaSync = 1760000000000;
+    expect(await invocar('sync:estado')).toEqual({
+      ok: true, dados: { estado: 'sincronizado', pendentes: 0, ultimo_sync_em: '2025-10-09T08:53:20.000Z' }
+    });
+    expect(await invocar('sync:estado', { canal: 'outro' })).toMatchObject({ ok: false, erro: { codigo: 'DADOS_INVALIDOS' } });
+    sessoes.definir(null);
+    expect(await invocar('sync:estado')).toMatchObject({ ok: false, erro: { codigo: 'NAO_AUTENTICADO' } });
+  });
 
   it('registra todos os canais e autoriza somente MASTER, com leitura limitada do lembrete', async () => {
     expect([...handlers.keys()].sort()).toEqual(Object.keys(canaisTrilha1).sort());
@@ -143,6 +171,10 @@ describe('Trilha 1 via registry IPC e SQLite', () => {
     await sucesso('configuracoes:atualizar', { nome_clinica: 'Veterinária Teste', cep: '', telefone: '' });
     await sucesso('configuracoes:atualizar', { backup_horario: '01:15', backup_manter: 10 });
     const backup = await sucesso('backup:criar') as { id: string };
+    enviando = true;
+    expect(await invocar('backup:restaurar', { id: backup.id }))
+      .toMatchObject({ ok: false, erro: { codigo: 'SYNC_EM_ANDAMENTO' } });
+    enviando = false;
     expect(backup).toMatchObject({ tipo: 'MANUAL', tamanho_bytes: expect.any(Number) });
     banco.prepare("UPDATE sync_outbox SET enviado_em = 1760000000 WHERE tabela = 'configuracoes'").run();
     await sucesso('configuracoes:atualizar', { nome_clinica: 'Alterada depois do backup' });
