@@ -14,6 +14,9 @@ export const TelefoneSchema = z.string().regex(/^\d{10,11}$/);
 export const CepSchema = z.string().regex(/^\d{8}$/);
 export const UfSchema = z.string().regex(/^[A-Z]{2}$/);
 export const EmailSchema = z.string().email().max(255);
+export function vazioOpcionalSchema(schema: z.ZodString) {
+  return z.union([schema, z.literal('')]).optional().transform((valor) => valor || undefined);
+}
 const paginacao = { pagina: z.number().int().min(1).max(1000000), tamanho: z.number().int().min(1).max(200) };
 export const EntradaListagemSchema = z.object({ ...paginacao, busca: z.string().trim().max(255).optional() }).catchall(z.unknown());
 export type EntradaListagem = z.infer<typeof EntradaListagemSchema>;

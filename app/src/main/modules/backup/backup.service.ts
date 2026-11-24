@@ -27,19 +27,23 @@ export class BackupService {
     return this.repository.listar();
   }
 
-  async criar(autor: AutorAuditoria, tipo: BackupArquivo['tipo'] = 'MANUAL'): Promise<BackupArquivo> {
+  async criar(autor: AutorAuditoria, diaAutomatico?: string): Promise<BackupArquivo> {
     return this.exclusivo(async () => {
+      const tipo = diaAutomatico ? 'AUTOMATICO' : 'MANUAL';
       const backup = await this.repository.criar(tipo);
       try {
-        runInTransaction(this.banco, () => this.auditoria.registrar(autor, {
-          acao: 'BACKUP', entidade: 'backup', registro_id: backup.id,
-          descricao: tipo === 'MANUAL' ? 'Criou um backup manual.' : 'Criou um backup automático.'
-        }));
+        runInTransaction(this.banco, () => {
+          this.auditoria.registrar(autor, {
+            acao: 'BACKUP', entidade: 'backup', registro_id: backup.id,
+            descricao: tipo === 'MANUAL' ? 'Criou um backup manual.' : 'Criou um backup automático.'
+          });
+          if (diaAutomatico) this.repository.registrarDiaAutomatico(diaAutomatico);
+        });
       } catch (erro) {
         this.repository.remover(backup);
         throw erro;
       }
-      this.aplicarRetencao();
+      this.aplicarRetencao(backup.id);
       return backup;
     });
   }
@@ -65,13 +69,15 @@ export class BackupService {
   async executarAgendado(agora = new Date()): Promise<void> {
     if (this.emAndamento || horaSaoPaulo.format(agora) < this.configuracoes.obter().backup_horario) return;
     const dia = diaSaoPaulo(agora);
+    if (this.repository.diaUltimoAutomatico() === dia) return;
     if (this.listar().some((b) => b.tipo === 'AUTOMATICO' && diaSaoPaulo(new Date(b.criado_em)) === dia)) return;
-    await this.criar({ usuarioId: null, nome: 'Sistema', perfil: 'MASTER' }, 'AUTOMATICO');
+    await this.criar({ usuarioId: null, nome: 'Sistema', perfil: 'MASTER' }, dia);
   }
 
-  private aplicarRetencao(): void {
+  private aplicarRetencao(novoId: string): void {
     const { backup_manter } = this.configuracoes.obter();
-    for (const arquivo of this.listar().slice(backup_manter)) {
+    const anteriores = this.listar().filter((arquivo) => arquivo.id !== novoId);
+    for (const arquivo of anteriores.slice(backup_manter - 1)) {
       try {
         this.repository.remover(arquivo);
       } catch {

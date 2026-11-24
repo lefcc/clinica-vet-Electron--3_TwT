@@ -5,9 +5,11 @@ import Database from 'better-sqlite3';
 import { BackupRestaurarSchema, type BackupArquivo } from '@clinica-vet/shared';
 import type { ConexaoLocal } from '../../db/local/conexao-local';
 import { EsquemaLocal } from '../../db/local/esquema-local';
+import { colunasSincronizaveis } from '../../db/local/tabelas-sincronizaveis';
 import { ErroNegocio } from '../../erros/erro-negocio';
 
 const nomeBackup = /^(AUTOMATICO|MANUAL)_([0-9a-f-]{36})\.sqlite$/i;
+const chaveUltimoAutomatico = 'backup_ultimo_dia_automatico';
 
 export class BackupRepository {
   constructor(private readonly conexao: ConexaoLocal, private readonly pasta: string) {}
@@ -45,6 +47,17 @@ export class BackupRepository {
 
   remover(arquivo: BackupArquivo): void {
     fs.rmSync(this.arquivo(arquivo), { force: true });
+  }
+
+  diaUltimoAutomatico(): string | undefined {
+    const linha = this.conexao.prepare('SELECT valor FROM sync_estado WHERE chave = ?')
+      .get(chaveUltimoAutomatico) as { valor: string } | undefined;
+    return linha?.valor;
+  }
+
+  registrarDiaAutomatico(dia: string): void {
+    this.conexao.prepare(`INSERT INTO sync_estado (chave, valor) VALUES (?, ?)
+      ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor`).run(chaveUltimoAutomatico, dia);
   }
 
   restaurar(id: string, aoAbrir: () => void): void {
@@ -111,10 +124,25 @@ export class BackupRepository {
   }
 
   private validar(arquivo: string): void {
-    const db = new Database(arquivo, { readonly: true, fileMustExist: true });
+    let db: Database.Database | undefined;
     try {
-      db.prepare('SELECT id, perfil FROM usuarios LIMIT 0').all();
-      db.prepare('SELECT id, cpf FROM colaboradores LIMIT 0').all();
+      db = new Database(arquivo, { readonly: true, fileMustExist: true });
+      const tabelas = new Map(db.prepare(
+        "SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view')"
+      ).all().map((linha) => {
+        const { name, type } = linha as { name: string; type: string };
+        return [name, type];
+      }));
+      for (const [tabela, colunas] of colunasSincronizaveis) {
+        const tipo = tabelas.get(tabela);
+        // Backups de antes da Trilha 1 podem ter apenas as tabelas de login.
+        if (tipo === undefined && tabela !== 'usuarios' && tabela !== 'colaboradores') continue;
+        const nomes = new Set(db.prepare('SELECT name FROM pragma_table_info(?)').all(tabela)
+          .map((linha) => (linha as { name: string }).name));
+        if (tipo !== 'table' || [...colunas.keys()].some((nome) => !nomes.has(nome))) {
+          throw new ErroNegocio('BACKUP_INVALIDO', 'O esquema do backup é incompatível.');
+        }
+      }
       const violacoes = db.pragma('foreign_key_check');
       if (db.pragma('quick_check', { simple: true }) !== 'ok' || !Array.isArray(violacoes) || violacoes.length) {
         throw new ErroNegocio('BACKUP_INVALIDO', 'O arquivo de backup está inconsistente.');
@@ -123,8 +151,11 @@ export class BackupRepository {
         WHERE u.perfil = 'MASTER' AND u.ativo = 1 AND c.ativo = 1 LIMIT 1`).get()) {
         throw new ErroNegocio('BACKUP_SEM_MASTER', 'O backup precisa conter um administrador ativo.');
       }
+    } catch (erro) {
+      if (erro instanceof ErroNegocio) throw erro;
+      throw new ErroNegocio('BACKUP_INVALIDO', 'Não foi possível validar o arquivo de backup.');
     } finally {
-      db.close();
+      db?.close();
     }
   }
 }

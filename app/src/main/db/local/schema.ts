@@ -1,6 +1,6 @@
 // Schema Drizzle para SQLite local
 // Tabelas definidas conforme AGENTS.md seção 7
-import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, uniqueIndex, check } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const colaboradores = sqliteTable('colaboradores', {
@@ -29,6 +29,7 @@ export const usuarios = sqliteTable('usuarios', {
   criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
 }, (table) => ({
+  perfilValido: check('ck_usuarios_perfil', sql`${table.perfil} IN ('MASTER', 'VETERINARIO', 'ATENDENTE')`),
   loginIdx: index('idx_usuarios_login').on(table.login),
   colaboradorIdx: index('idx_usuarios_colaborador').on(table.colaboradorId)
 }));
@@ -69,6 +70,7 @@ export const animais = sqliteTable('animais', {
   criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
 }, (table) => ({
+  sexoValido: check('ck_animais_sexo', sql`${table.sexo} IN ('M', 'F')`),
   clienteIdx: index('idx_animais_cliente').on(table.clienteId),
   ativoIdx: index('idx_animais_ativo').on(table.ativo)
 }));
@@ -99,6 +101,7 @@ export const fornecedores = sqliteTable('fornecedores', {
   criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
 }, (table) => ({
+  tipoValido: check('ck_fornecedores_tipo', sql`${table.tipo} IN ('NACIONAL', 'IMPORTADO')`),
   ativoIdx: index('idx_fornecedores_ativo').on(table.ativo)
 }));
 
@@ -114,6 +117,7 @@ export const syncOutbox = sqliteTable('sync_outbox', {
   ultimoErro: text('ultimo_erro'),
   enviadoEm: integer('enviado_em', { mode: 'timestamp' })
 }, (table) => ({
+  operacaoValido: check('ck_sync_outbox_operacao', sql`${table.operacao} IN ('inserir', 'atualizar', 'inativar')`),
   tabelaRegistroIdx: index('idx_sync_outbox_tabela_registro').on(table.tabela, table.registroId),
   enviadoIdx: index('idx_sync_outbox_enviado').on(table.enviadoEm)
 }));
@@ -135,6 +139,7 @@ export const syncConflitos = sqliteTable('sync_conflitos', {
   resolvidoPor: text('resolvido_por'),
   resolvidoEm: integer('resolvido_em', { mode: 'timestamp' })
 }, (table) => ({
+  statusValido: check('ck_sync_conflitos_status', sql`${table.status} IN ('aberto', 'resolvido')`),
   tabelaRegistroIdx: index('idx_sync_conflitos_tabela_registro').on(table.tabela, table.registroId),
   statusIdx: index('idx_sync_conflitos_status').on(table.status)
 }));
@@ -165,6 +170,7 @@ export const agendamentos = sqliteTable('agendamentos', {
   criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
 }, (table) => ({
+  statusValido: check('ck_agendamentos_status', sql`${table.status} IN ('AGENDADO', 'CONFIRMADO', 'REALIZADO', 'CANCELADO')`),
   idxAgendamentosVeterinarioId: index('idx_agendamentos_veterinario_id').on(table.veterinarioId, table.inicio),
   idxAgendamentosAnimalId: index('idx_agendamentos_animal_id').on(table.animalId)
 }));
@@ -223,6 +229,7 @@ export const movimentacoesEstoque = sqliteTable('movimentacoes_estoque', {
   criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
 }, (table) => ({
+  tipoValido: check('ck_movimentacoes_estoque_tipo', sql`${table.tipo} IN ('ENTRADA', 'SAIDA', 'AJUSTE')`),
   idxMovimentacoesEstoqueMedicamentoId: index('idx_movimentacoes_estoque_medicamento_id').on(table.medicamentoId, table.criadoEm),
   idxMovimentacoesEstoqueLoteId: index('idx_movimentacoes_estoque_lote_id').on(table.loteId)
 }));
@@ -239,6 +246,7 @@ export const alertasEstoque = sqliteTable('alertas_estoque', {
   criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
 }, (table) => ({
+  statusValido: check('ck_alertas_estoque_status', sql`${table.status} IN ('aberto', 'resolvido')`),
   idxAlertasEstoqueMedicamentoId: index('idx_alertas_estoque_medicamento_id').on(table.medicamentoId, table.status)
 }));
 
@@ -252,6 +260,7 @@ export const fornecedoresPrecos = sqliteTable('fornecedores_precos', {
   criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
 }, (table) => ({
+  moedaValido: check('ck_fornecedores_precos_moeda', sql`${table.moeda} IN ('BRL', 'USD')`),
   uqFornecedoresPrecosMedicamentoId: uniqueIndex('uq_fornecedores_precos_medicamento_id').on(table.medicamentoId, table.fornecedorId)
 }));
 
@@ -306,6 +315,7 @@ export const lembretesVacina = sqliteTable('lembretes_vacina', {
   criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
 }, (table) => ({
+  statusValido: check('ck_lembretes_vacina_status', sql`${table.status} IN ('pendente', 'enviado')`),
   uqLembretesVacinaVacinaId: uniqueIndex('uq_lembretes_vacina_vacina_id').on(table.vacinaId)
 }));
 
@@ -348,6 +358,7 @@ export const orcamentosItens = sqliteTable('orcamentos_itens', {
   criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
 }, (table) => ({
+  tipoValido: check('ck_orcamentos_itens_tipo', sql`${table.tipo} IN ('SERVICO', 'MEDICAMENTO')`),
   idxOrcamentosItensOrcamentoId: index('idx_orcamentos_itens_orcamento_id').on(table.orcamentoId)
 }));
 
@@ -367,6 +378,7 @@ export const auditoria = sqliteTable('auditoria', {
   criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
 }, (table) => ({
+  perfilValido: check('ck_auditoria_perfil', sql`${table.perfil} IN ('MASTER', 'VETERINARIO', 'ATENDENTE')`),
   idxAuditoriaOcorridoEm: index('idx_auditoria_ocorrido_em').on(table.ocorridoEm),
   idxAuditoriaEntidade: index('idx_auditoria_entidade').on(table.entidade, table.acao)
 }));

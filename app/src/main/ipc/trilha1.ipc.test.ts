@@ -29,6 +29,7 @@ describe('Trilha 1 via registry IPC e SQLite', () => {
   let banco: ConexaoLocal;
   let masterId: string;
   let destruir: () => void;
+  let services: ReturnType<typeof criarTrilha1>;
 
   beforeEach(async () => {
     pasta = mkdtempSync(join(tmpdir(), 'clinica-trilha1-'));
@@ -40,7 +41,8 @@ describe('Trilha 1 via registry IPC e SQLite', () => {
     masterId = usuarios.buscarAtivoPorLogin('admin')!.id;
     permitirOrigemIpc(1, (remover) => { destruir = remover; });
     autenticar();
-    registrarTrilha1(criarTrilha1(banco, hash));
+    services = criarTrilha1(banco, hash);
+    registrarTrilha1(services);
   });
 
   afterEach(() => {
@@ -98,6 +100,7 @@ describe('Trilha 1 via registry IPC e SQLite', () => {
     const criado = await sucesso('colaboradores:criar', novo) as { id: string };
     expect(criado).not.toHaveProperty('senha');
     expect(criado).not.toHaveProperty('senha_hash');
+    expect(await sucesso('colaboradores:obter', { id: criado.id })).toEqual(criado);
     expect(contar('auditoria')).toBe(1);
     expect(contar('sync_outbox')).toBe(3);
     expect(await sucesso('colaboradores:listar', { ...pagina, busca: 'rita' })).toMatchObject({ total: 1, itens: [criado] });
@@ -154,8 +157,24 @@ describe('Trilha 1 via registry IPC e SQLite', () => {
       .toEqual({ total: 2 });
     expect(await invocar('backup:restaurar', { id: '../clinica.sqlite' })).toMatchObject({ ok: false, erro: { codigo: 'DADOS_INVALIDOS' } });
     writeFileSync(join(pasta, 'backups', 'MANUAL_c42450ca-563a-46fd-ab9b-57e726846d20.sqlite'), 'arquivo inválido');
-    expect(await invocar('backup:restaurar', { id: 'c42450ca-563a-46fd-ab9b-57e726846d20' })).toMatchObject({ ok: false });
+    expect(await invocar('backup:restaurar', { id: 'c42450ca-563a-46fd-ab9b-57e726846d20' }))
+      .toMatchObject({ ok: false, erro: { codigo: 'BACKUP_INVALIDO' } });
     expect(await sucesso('configuracoes:obter')).toMatchObject({ nome_clinica: 'Veterinária Teste' });
+  });
+
+  it('agenda uma cópia por dia de São Paulo e mantém a última cópia ao aplicar retenção', async () => {
+    await sucesso('configuracoes:atualizar', { backup_horario: '20:00', backup_manter: 1 });
+    const antes = new Date('2030-01-11T22:59:00.000Z');
+    const horario = new Date('2030-01-11T23:00:00.000Z');
+    await services.backup.executarAgendado(antes);
+    expect(await sucesso('backup:listar')).toEqual([]);
+    await services.backup.executarAgendado(horario);
+    expect(await sucesso('backup:listar')).toMatchObject([{ tipo: 'AUTOMATICO' }]);
+    const manual = await sucesso('backup:criar');
+    expect(await sucesso('backup:listar')).toEqual([manual]);
+    await services.backup.executarAgendado(new Date('2030-01-12T00:01:00.000Z'));
+    expect(await sucesso('backup:listar')).toEqual([manual]);
+    expect(await sucesso('auditoria:listar', { ...pagina, acao: 'BACKUP' })).toMatchObject({ total: 2 });
   });
 
   it('resolve as duas escolhas e remove apenas pendências substituídas', async () => {
@@ -181,8 +200,12 @@ describe('Trilha 1 via registry IPC e SQLite', () => {
     const usuario = banco.prepare('SELECT * FROM usuarios WHERE id = ?').get(masterId) as object;
     banco.prepare(
       'INSERT INTO sync_conflitos (tabela, registro_id, tipo, dados_local, dados_central) VALUES (?, ?, ?, ?, ?)'
-    ).run('usuarios', masterId, 'EDICAO_CONCORRENTE', JSON.stringify(usuario), JSON.stringify(usuario));
+    ).run('usuarios', masterId, 'EDICAO_CONCORRENTE', JSON.stringify(usuario), JSON.stringify({ ...usuario, ativo: false }));
     const visivel = await sucesso('sync_conflitos:listar');
     expect(JSON.stringify(visivel)).not.toContain('senha_hash');
+    expect(await invocar('sync_conflitos:resolver', { id: '3', escolha: 'CENTRAL' }))
+      .toMatchObject({ ok: false, erro: { codigo: 'ULTIMO_MASTER' } });
+    expect(await sucesso('sync_conflitos:listar')).toEqual(visivel);
+    expect(banco.prepare('SELECT ativo FROM usuarios WHERE id = ?').get(masterId)).toEqual({ ativo: 1 });
   });
 });

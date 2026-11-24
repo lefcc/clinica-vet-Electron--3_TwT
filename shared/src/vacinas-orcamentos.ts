@@ -33,3 +33,6 @@ export const OrcamentoSchema = z.object({
 });
 export type Orcamento = z.infer<typeof OrcamentoSchema>;
 export const OrcamentoPdfSchema = z.object({ caminho: z.string().min(1) });
+export const CobrancaSchema = OrcamentoSchema.pick({
+  numero: true, cliente_nome: true, forma_pagamento: true, total_centavos: true
+}).extend({ data: DataUtcSchema }).strict();

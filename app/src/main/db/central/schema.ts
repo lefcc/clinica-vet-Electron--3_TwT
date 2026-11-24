@@ -1,6 +1,6 @@
 // Schema Drizzle para MySQL central
 // Mesmas tabelas do SQLite (exceto sync_outbox, sync_estado, sync_conflitos)
-import { mysqlTable, varchar, text, int, decimal, timestamp, date, index, uniqueIndex, boolean, json } from 'drizzle-orm/mysql-core';
+import { mysqlTable, varchar, mysqlEnum, text, int, decimal, timestamp, date, index, uniqueIndex, boolean, json } from 'drizzle-orm/mysql-core';
 
 export const colaboradores = mysqlTable('colaboradores', {
   id: varchar('id', { length: 36 }).primaryKey(),
@@ -22,7 +22,7 @@ export const usuarios = mysqlTable('usuarios', {
   colaboradorId: varchar('colaborador_id', { length: 36 }).notNull().unique().references(() => colaboradores.id),
   login: varchar('login', { length: 100 }).notNull().unique(),
   senhaHash: varchar('senha_hash', { length: 255 }).notNull(),
-  perfil: varchar('perfil', { length: 20, enum: ['MASTER', 'VETERINARIO', 'ATENDENTE'] }).notNull(),
+  perfil: mysqlEnum('perfil', ['MASTER', 'VETERINARIO', 'ATENDENTE']).notNull(),
   ativo: boolean('ativo').notNull().default(true),
   ultimoLoginEm: timestamp('ultimo_login_em'),
   criadoEm: timestamp('criado_em').notNull().defaultNow(),
@@ -60,7 +60,7 @@ export const animais = mysqlTable('animais', {
   nome: varchar('nome', { length: 255 }).notNull(),
   especie: varchar('especie', { length: 100 }).notNull(),
   raca: varchar('raca', { length: 100 }),
-  sexo: varchar('sexo', { length: 1, enum: ['M', 'F'] }).notNull(),
+  sexo: mysqlEnum('sexo', ['M', 'F']).notNull(),
   dataNascimento: timestamp('data_nascimento'),
   pesoKg: decimal('peso_kg', { precision: 6, scale: 2 }),
   observacoes: text('observacoes'),
@@ -90,7 +90,7 @@ export const medicamentos = mysqlTable('medicamentos', {
 export const fornecedores = mysqlTable('fornecedores', {
   id: varchar('id', { length: 36 }).primaryKey(),
   nome: varchar('nome', { length: 255 }).notNull(),
-  tipo: varchar('tipo', { length: 20, enum: ['NACIONAL', 'IMPORTADO'] }).notNull(),
+  tipo: mysqlEnum('tipo', ['NACIONAL', 'IMPORTADO']).notNull(),
   contato: varchar('contato', { length: 255 }),
   telefone: varchar('telefone', { length: 20 }),
   email: varchar('email', { length: 255 }),
@@ -121,7 +121,7 @@ export const agendamentos = mysqlTable('agendamentos', {
   inicio: timestamp('inicio').notNull(),
   duracaoMin: int('duracao_min').notNull(),
   motivo: text('motivo'),
-  status: varchar('status', { length: 20, enum: ['AGENDADO', 'CONFIRMADO', 'REALIZADO', 'CANCELADO'] }).notNull().default('AGENDADO'),
+  status: mysqlEnum('status', ['AGENDADO', 'CONFIRMADO', 'REALIZADO', 'CANCELADO']).notNull().default('AGENDADO'),
   confirmado: boolean('confirmado').notNull().default(false),
   ativo: boolean('ativo').notNull().default(true),
   criadoEm: timestamp('criado_em').notNull().defaultNow(),
@@ -178,7 +178,7 @@ export const movimentacoesEstoque = mysqlTable('movimentacoes_estoque', {
   loteId: varchar('lote_id', { length: 36 }).notNull().references(() => lotesEstoque.id),
   consultaId: varchar('consulta_id', { length: 36 }).references(() => consultas.id),
   usuarioId: varchar('usuario_id', { length: 36 }).notNull().references(() => usuarios.id),
-  tipo: varchar('tipo', { length: 20, enum: ['ENTRADA', 'SAIDA', 'AJUSTE'] }).notNull(),
+  tipo: mysqlEnum('tipo', ['ENTRADA', 'SAIDA', 'AJUSTE']).notNull(),
   quantidade: decimal('quantidade', { precision: 14, scale: 4 }).notNull(),
   motivo: text('motivo'),
   ativo: boolean('ativo').notNull().default(true),
@@ -195,7 +195,7 @@ export const alertasEstoque = mysqlTable('alertas_estoque', {
   diasRestantes: int('dias_restantes').notNull(),
   saldoAtual: decimal('saldo_atual', { precision: 14, scale: 4 }).notNull(),
   consumoMedioDiario: decimal('consumo_medio_diario', { precision: 14, scale: 4 }).notNull(),
-  status: varchar('status', { length: 20, enum: ['aberto', 'resolvido'] }).notNull().default('aberto'),
+  status: mysqlEnum('status', ['aberto', 'resolvido']).notNull().default('aberto'),
   resolvidoEm: timestamp('resolvido_em'),
   ativo: boolean('ativo').notNull().default(true),
   criadoEm: timestamp('criado_em').notNull().defaultNow(),
@@ -208,7 +208,7 @@ export const fornecedoresPrecos = mysqlTable('fornecedores_precos', {
   id: varchar('id', { length: 36 }).primaryKey().notNull(),
   medicamentoId: varchar('medicamento_id', { length: 36 }).notNull().references(() => medicamentos.id),
   fornecedorId: varchar('fornecedor_id', { length: 36 }).notNull().references(() => fornecedores.id),
-  moeda: varchar('moeda', { length: 20, enum: ['BRL', 'USD'] }).notNull(),
+  moeda: mysqlEnum('moeda', ['BRL', 'USD']).notNull(),
   precoCentavos: int('preco_centavos').notNull(),
   ativo: boolean('ativo').notNull().default(true),
   criadoEm: timestamp('criado_em').notNull().defaultNow(),
@@ -262,7 +262,7 @@ export const lembretesVacina = mysqlTable('lembretes_vacina', {
   vacinaId: varchar('vacina_id', { length: 36 }).notNull().references(() => vacinasAplicacoes.id),
   mensagem: text('mensagem').notNull(),
   telefone: varchar('telefone', { length: 20 }).notNull(),
-  status: varchar('status', { length: 20, enum: ['pendente', 'enviado'] }).notNull().default('pendente'),
+  status: mysqlEnum('status', ['pendente', 'enviado']).notNull().default('pendente'),
   enviadoEm: timestamp('enviado_em'),
   ativo: boolean('ativo').notNull().default(true),
   criadoEm: timestamp('criado_em').notNull().defaultNow(),
@@ -301,7 +301,7 @@ export const orcamentos = mysqlTable('orcamentos', {
 export const orcamentosItens = mysqlTable('orcamentos_itens', {
   id: varchar('id', { length: 36 }).primaryKey().notNull(),
   orcamentoId: varchar('orcamento_id', { length: 36 }).notNull().references(() => orcamentos.id),
-  tipo: varchar('tipo', { length: 20, enum: ['SERVICO', 'MEDICAMENTO'] }).notNull(),
+  tipo: mysqlEnum('tipo', ['SERVICO', 'MEDICAMENTO']).notNull(),
   itemId: varchar('item_id', { length: 36 }).notNull(),
   descricao: varchar('descricao', { length: 255 }).notNull(),
   quantidade: int('quantidade').notNull(),
@@ -318,7 +318,7 @@ export const auditoria = mysqlTable('auditoria', {
   ocorridoEm: timestamp('ocorrido_em').notNull(),
   usuarioId: varchar('usuario_id', { length: 36 }),
   usuarioNome: varchar('usuario_nome', { length: 255 }).notNull(),
-  perfil: varchar('perfil', { length: 20, enum: ['MASTER', 'VETERINARIO', 'ATENDENTE'] }).notNull(),
+  perfil: mysqlEnum('perfil', ['MASTER', 'VETERINARIO', 'ATENDENTE']).notNull(),
   acao: varchar('acao', { length: 60 }).notNull(),
   entidade: varchar('entidade', { length: 100 }).notNull(),
   registroId: varchar('registro_id', { length: 36 }),

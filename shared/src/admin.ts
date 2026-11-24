@@ -1,19 +1,18 @@
 import { z } from 'zod';
 import { PerfilSchema } from './perfil';
-import { CepSchema, CpfSchema, DataUtcSchema, EmailSchema, EntradaListagemSchema, IdSchema, NomeSchema, PorIdSchema, SemEntradaSchema, TelefoneSchema, UfSchema, VazioSchema, paginaSchema } from './comum';
+import { CepSchema, CpfSchema, DataUtcSchema, EmailSchema, EntradaListagemSchema, IdSchema, NomeSchema, PorIdSchema, SemEntradaSchema, TelefoneSchema, UfSchema, VazioSchema, paginaSchema, vazioOpcionalSchema } from './comum';
 
 const SenhaSchema = z.string().min(8).max(72).refine((senha) => new TextEncoder().encode(senha).length <= 72, 'Use até 72 bytes na senha.');
 const LoginSchema = z.string().trim().min(1).max(60);
-const vazioOpcional = (schema: z.ZodString) => z.union([schema, z.literal('')]).optional()
-  .transform((valor) => valor || undefined);
 const CamposColaborador = z.object({
   nome: NomeSchema, cpf: CpfSchema, cargo: z.string().trim().min(1).max(100), crmv: z.string().trim().max(20).optional(),
-  telefone: vazioOpcional(TelefoneSchema), login: LoginSchema, perfil: PerfilSchema
+  telefone: TelefoneSchema.optional(), login: LoginSchema, perfil: PerfilSchema
 }).strict();
 export const ColaboradorSchema = CamposColaborador.extend({ id: IdSchema, ativo: z.boolean() });
 export type Colaborador = z.infer<typeof ColaboradorSchema>;
-export const ColaboradorCriarSchema = CamposColaborador.extend({ senha: SenhaSchema });
-export const ColaboradorAtualizarSchema = CamposColaborador.partial().extend({ id: IdSchema });
+const ColaboradorEntradaSchema = CamposColaborador.extend({ telefone: vazioOpcionalSchema(TelefoneSchema) });
+export const ColaboradorCriarSchema = ColaboradorEntradaSchema.extend({ senha: SenhaSchema });
+export const ColaboradorAtualizarSchema = ColaboradorEntradaSchema.partial().extend({ id: IdSchema });
 export const RedefinirSenhaSchema = PorIdSchema.extend({ nova_senha: SenhaSchema });
 
 export const AuditoriaRegistroSchema = z.object({
@@ -34,7 +33,7 @@ export const ConfiguracoesSchema = z.object({
 }).strict();
 export type Configuracoes = z.infer<typeof ConfiguracoesSchema>;
 export const ConfiguracoesAtualizarSchema = ConfiguracoesSchema.partial().extend({
-  telefone: vazioOpcional(TelefoneSchema), cep: vazioOpcional(CepSchema)
+  telefone: vazioOpcionalSchema(TelefoneSchema), cep: vazioOpcionalSchema(CepSchema)
 });
 export const TemplateLembreteSchema = ConfiguracoesSchema.pick({ template_lembrete: true });
 export const BackupArquivoSchema = z.object({
