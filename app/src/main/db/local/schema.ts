@@ -1,6 +1,6 @@
 // Schema Drizzle para SQLite local
 // Tabelas definidas conforme AGENTS.md seção 7
-import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const colaboradores = sqliteTable('colaboradores', {
@@ -151,3 +151,241 @@ export type Medicamento = typeof medicamentos.$inferSelect;
 export type NovoMedicamento = typeof medicamentos.$inferInsert;
 export type Fornecedor = typeof fornecedores.$inferSelect;
 export type NovoFornecedor = typeof fornecedores.$inferInsert;
+
+export const agendamentos = sqliteTable('agendamentos', {
+  id: text('id').primaryKey().notNull(),
+  animalId: text('animal_id').notNull().references(() => animais.id),
+  veterinarioId: text('veterinario_id').notNull().references(() => colaboradores.id),
+  inicio: integer('inicio', { mode: 'timestamp' }).notNull(),
+  duracaoMin: integer('duracao_min').notNull(),
+  motivo: text('motivo'),
+  status: text('status', { enum: ['AGENDADO', 'CONFIRMADO', 'REALIZADO', 'CANCELADO'] }).notNull().default('AGENDADO'),
+  confirmado: integer('confirmado', { mode: 'boolean' }).notNull().default(false),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxAgendamentosVeterinarioId: index('idx_agendamentos_veterinario_id').on(table.veterinarioId, table.inicio),
+  idxAgendamentosAnimalId: index('idx_agendamentos_animal_id').on(table.animalId)
+}));
+
+export const consultas = sqliteTable('consultas', {
+  id: text('id').primaryKey().notNull(),
+  animalId: text('animal_id').notNull().references(() => animais.id),
+  veterinarioId: text('veterinario_id').notNull().references(() => colaboradores.id),
+  data: integer('data', { mode: 'timestamp' }).notNull(),
+  anamnese: text('anamnese').notNull(),
+  diagnostico: text('diagnostico'),
+  observacoes: text('observacoes'),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxConsultasAnimalId: index('idx_consultas_animal_id').on(table.animalId, table.data)
+}));
+
+export const prescricoesConsulta = sqliteTable('prescricoes_consulta', {
+  id: text('id').primaryKey().notNull(),
+  consultaId: text('consulta_id').notNull().references(() => consultas.id),
+  medicamentoId: text('medicamento_id').notNull().references(() => medicamentos.id),
+  quantidade: real('quantidade').notNull(),
+  posologia: text('posologia'),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxPrescricoesConsultaConsultaId: index('idx_prescricoes_consulta_consulta_id').on(table.consultaId)
+}));
+
+export const lotesEstoque = sqliteTable('lotes_estoque', {
+  id: text('id').primaryKey().notNull(),
+  medicamentoId: text('medicamento_id').notNull().references(() => medicamentos.id),
+  numero: text('numero').notNull(),
+  validade: text('validade').notNull(),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxLotesEstoqueMedicamentoId: index('idx_lotes_estoque_medicamento_id').on(table.medicamentoId, table.validade),
+  uqLotesEstoqueMedicamentoId: uniqueIndex('uq_lotes_estoque_medicamento_id').on(table.medicamentoId, table.numero)
+}));
+
+export const movimentacoesEstoque = sqliteTable('movimentacoes_estoque', {
+  id: text('id').primaryKey().notNull(),
+  medicamentoId: text('medicamento_id').notNull().references(() => medicamentos.id),
+  loteId: text('lote_id').notNull().references(() => lotesEstoque.id),
+  consultaId: text('consulta_id').references(() => consultas.id),
+  usuarioId: text('usuario_id').notNull().references(() => usuarios.id),
+  tipo: text('tipo', { enum: ['ENTRADA', 'SAIDA', 'AJUSTE'] }).notNull(),
+  quantidade: real('quantidade').notNull(),
+  motivo: text('motivo'),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxMovimentacoesEstoqueMedicamentoId: index('idx_movimentacoes_estoque_medicamento_id').on(table.medicamentoId, table.criadoEm),
+  idxMovimentacoesEstoqueLoteId: index('idx_movimentacoes_estoque_lote_id').on(table.loteId)
+}));
+
+export const alertasEstoque = sqliteTable('alertas_estoque', {
+  id: text('id').primaryKey().notNull(),
+  medicamentoId: text('medicamento_id').notNull().references(() => medicamentos.id),
+  diasRestantes: integer('dias_restantes').notNull(),
+  saldoAtual: real('saldo_atual').notNull(),
+  consumoMedioDiario: real('consumo_medio_diario').notNull(),
+  status: text('status', { enum: ['aberto', 'resolvido'] }).notNull().default('aberto'),
+  resolvidoEm: integer('resolvido_em', { mode: 'timestamp' }),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxAlertasEstoqueMedicamentoId: index('idx_alertas_estoque_medicamento_id').on(table.medicamentoId, table.status)
+}));
+
+export const fornecedoresPrecos = sqliteTable('fornecedores_precos', {
+  id: text('id').primaryKey().notNull(),
+  medicamentoId: text('medicamento_id').notNull().references(() => medicamentos.id),
+  fornecedorId: text('fornecedor_id').notNull().references(() => fornecedores.id),
+  moeda: text('moeda', { enum: ['BRL', 'USD'] }).notNull(),
+  precoCentavos: integer('preco_centavos').notNull(),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  uqFornecedoresPrecosMedicamentoId: uniqueIndex('uq_fornecedores_precos_medicamento_id').on(table.medicamentoId, table.fornecedorId)
+}));
+
+export const cotacoesDolar = sqliteTable('cotacoes_dolar', {
+  id: text('id').primaryKey().notNull(),
+  valorCentavos: integer('valor_centavos').notNull(),
+  dataCotacao: integer('data_cotacao', { mode: 'timestamp' }).notNull(),
+  fonte: text('fonte').notNull(),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxCotacoesDolarDataCotacao: index('idx_cotacoes_dolar_data_cotacao').on(table.dataCotacao)
+}));
+
+export const vacinasCatalogo = sqliteTable('vacinas_catalogo', {
+  id: text('id').primaryKey().notNull(),
+  nome: text('nome').notNull(),
+  descricao: text('descricao'),
+  intervaloReforcoDias: integer('intervalo_reforco_dias').notNull(),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxVacinasCatalogoNome: index('idx_vacinas_catalogo_nome').on(table.nome)
+}));
+
+export const vacinasAplicacoes = sqliteTable('vacinas_aplicacoes', {
+  id: text('id').primaryKey().notNull(),
+  animalId: text('animal_id').notNull().references(() => animais.id),
+  vacinaId: text('vacina_id').notNull().references(() => vacinasCatalogo.id),
+  veterinarioId: text('veterinario_id').notNull().references(() => colaboradores.id),
+  data: text('data').notNull(),
+  proximaDose: text('proxima_dose').notNull(),
+  lote: text('lote'),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxVacinasAplicacoesProximaDose: index('idx_vacinas_aplicacoes_proxima_dose').on(table.proximaDose),
+  idxVacinasAplicacoesAnimalId: index('idx_vacinas_aplicacoes_animal_id').on(table.animalId)
+}));
+
+export const lembretesVacina = sqliteTable('lembretes_vacina', {
+  id: text('id').primaryKey().notNull(),
+  vacinaId: text('vacina_id').notNull().references(() => vacinasAplicacoes.id),
+  mensagem: text('mensagem').notNull(),
+  telefone: text('telefone').notNull(),
+  status: text('status', { enum: ['pendente', 'enviado'] }).notNull().default('pendente'),
+  enviadoEm: integer('enviado_em', { mode: 'timestamp' }),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  uqLembretesVacinaVacinaId: uniqueIndex('uq_lembretes_vacina_vacina_id').on(table.vacinaId)
+}));
+
+export const servicos = sqliteTable('servicos', {
+  id: text('id').primaryKey().notNull(),
+  nome: text('nome').notNull(),
+  valorCentavos: integer('valor_centavos').notNull(),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxServicosNome: index('idx_servicos_nome').on(table.nome)
+}));
+
+export const orcamentos = sqliteTable('orcamentos', {
+  id: text('id').primaryKey().notNull(),
+  numero: integer('numero').notNull(),
+  clienteId: text('cliente_id').notNull().references(() => clientes.id),
+  animalId: text('animal_id').references(() => animais.id),
+  descontoCentavos: integer('desconto_centavos').notNull(),
+  totalCentavos: integer('total_centavos').notNull(),
+  formaPagamento: text('forma_pagamento').notNull(),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxOrcamentosClienteId: index('idx_orcamentos_cliente_id').on(table.clienteId, table.criadoEm),
+  uqOrcamentosNumero: uniqueIndex('uq_orcamentos_numero').on(table.numero)
+}));
+
+export const orcamentosItens = sqliteTable('orcamentos_itens', {
+  id: text('id').primaryKey().notNull(),
+  orcamentoId: text('orcamento_id').notNull().references(() => orcamentos.id),
+  tipo: text('tipo', { enum: ['SERVICO', 'MEDICAMENTO'] }).notNull(),
+  itemId: text('item_id').notNull(),
+  descricao: text('descricao').notNull(),
+  quantidade: integer('quantidade').notNull(),
+  valorUnitarioCentavos: integer('valor_unitario_centavos').notNull(),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxOrcamentosItensOrcamentoId: index('idx_orcamentos_itens_orcamento_id').on(table.orcamentoId)
+}));
+
+export const auditoria = sqliteTable('auditoria', {
+  id: text('id').primaryKey().notNull(),
+  ocorridoEm: integer('ocorrido_em', { mode: 'timestamp' }).notNull(),
+  usuarioId: text('usuario_id'),
+  usuarioNome: text('usuario_nome').notNull(),
+  perfil: text('perfil', { enum: ['MASTER', 'VETERINARIO', 'ATENDENTE'] }).notNull(),
+  acao: text('acao').notNull(),
+  entidade: text('entidade').notNull(),
+  registroId: text('registro_id'),
+  descricao: text('descricao').notNull(),
+  dadosAntes: text('dados_antes', { mode: 'json' }),
+  dadosDepois: text('dados_depois', { mode: 'json' }),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+}, (table) => ({
+  idxAuditoriaOcorridoEm: index('idx_auditoria_ocorrido_em').on(table.ocorridoEm),
+  idxAuditoriaEntidade: index('idx_auditoria_entidade').on(table.entidade, table.acao)
+}));
+
+export const configuracoes = sqliteTable('configuracoes', {
+  id: text('id').primaryKey().notNull(),
+  nomeClinica: text('nome_clinica').notNull(),
+  telefone: text('telefone'),
+  email: text('email'),
+  cep: text('cep'),
+  logradouro: text('logradouro'),
+  numero: text('numero'),
+  bairro: text('bairro'),
+  cidade: text('cidade'),
+  uf: text('uf'),
+  templateLembrete: text('template_lembrete').notNull(),
+  backupHorario: text('backup_horario').notNull(),
+  backupManter: integer('backup_manter').notNull(),
+  ativo: integer('ativo', { mode: 'boolean' }).notNull().default(true),
+  criadoEm: integer('criado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  atualizadoEm: integer('atualizado_em', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`)
+});

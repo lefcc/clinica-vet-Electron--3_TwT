@@ -2,6 +2,10 @@
 import { getLocalDb } from '../db/local/client';
 import { runInTransaction } from '../db/central/client';
 import { config } from '../config/env';
+import { z } from 'zod';
+import type { RowDataPacket } from 'mysql2/promise';
+import { colunasSincronizaveis } from '../db/local/tabelas-sincronizaveis';
+import { agoraEmSegundos } from '../modules/admin/transacao';
 
 export interface SyncStatus {
   pendentes: number;
@@ -49,25 +53,25 @@ export async function executarPush(): Promise<{ enviados: number; erros: number 
       SELECT id, tabela, registro_id, operacao, dados
       FROM sync_outbox
       WHERE enviado_em IS NULL
-      ORDER BY criado_em ASC
+      ORDER BY id ASC
       LIMIT ?
     `).all(config.sync.batchSize) as Array<{
       id: number;
       tabela: string;
       registro_id: string;
       operacao: 'inserir' | 'atualizar' | 'inativar';
-      dados: Record<string, unknown>;
+      dados: string;
     }>;
 
     for (const item of pendentes) {
       try {
         await pushItem(item);
         db.prepare('UPDATE sync_outbox SET enviado_em = ?, tentativas = tentativas + 1 WHERE id = ?')
-          .run(Date.now(), item.id);
+          .run(agoraEmSegundos(), item.id);
         enviados++;
-      } catch (error) {
+      } catch {
         erros++;
-        const mensagem = error instanceof Error ? error.message : 'Erro desconhecido';
+        const mensagem = 'Não foi possível enviar o registro ao banco central.';
         db.prepare('UPDATE sync_outbox SET tentativas = tentativas + 1, ultimo_erro = ? WHERE id = ?')
           .run(mensagem, item.id);
       }
@@ -89,84 +93,52 @@ async function pushItem(item: {
   tabela: string;
   registro_id: string;
   operacao: 'inserir' | 'atualizar' | 'inativar';
-  dados: Record<string, unknown>;
+  dados: string;
 }): Promise<void> {
+  const { tabela, registro_id: id } = item;
+  const colunas = colunasSincronizaveis.get(tabela);
+  if (!colunas) throw new Error('Tabela de sincronização inválida.');
+  const dados = z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).parse(JSON.parse(item.dados));
+  if ((dados.id !== undefined && dados.id !== id) || Object.keys(dados).some((campo) => !colunas.has(campo))) {
+    throw new Error('Dados da fila de sincronização inválidos.');
+  }
+  const valores = Object.entries(dados).filter(([campo]) => campo !== 'id').map(([campo, valor]) => {
+    const coluna = colunas.get(campo);
+    const convertido = coluna?.columnType === 'SQLiteTimestamp' && typeof valor === 'number'
+      ? new Date(valor * 1000)
+      : valor;
+    return [campo, convertido] as const;
+  });
+  if (item.operacao === 'inativar' && !valores.some(([campo]) => campo === 'ativo')) {
+    valores.push(['ativo', 0]);
+  }
+  if (!valores.length) throw new Error('Dados da fila de sincronização vazios.');
+  const tabelaSql = crase(tabela);
   await runInTransaction(async (conn) => {
-    const { tabela, registro_id, operacao, dados } = item;
-
-    switch (operacao) {
-      case 'inserir': {
-        const colunas = Object.keys(dados).join(', ');
-        const placeholders = Object.keys(dados).map(() => '?').join(', ');
-        const valores = Object.values(dados) as (string | number | boolean | null)[];
-        await conn.execute(
-          `INSERT INTO \`${tabela}\` (${colunas}) VALUES (${placeholders})`,
-          valores
-        );
-        break;
-      }
-      case 'atualizar': {
-        const sets = Object.keys(dados).filter(k => k !== 'id').map(k => `\`${k}\` = ?`).join(', ');
-        const valores = [...Object.entries(dados).filter(([k]) => k !== 'id').map(([, v]) => v), registro_id] as (string | number | boolean | null)[];
-        await conn.execute(
-          `UPDATE \`${tabela}\` SET ${sets} WHERE id = ?`,
-          valores
-        );
-        break;
-      }
-      case 'inativar': {
-        await conn.execute(
-          `UPDATE \`${tabela}\` SET ativo = FALSE, atualizado_em = NOW() WHERE id = ?`,
-          [registro_id]
-        );
-        break;
-      }
+    const [existentes] = await conn.execute<RowDataPacket[]>(
+      `SELECT id FROM ${tabelaSql} WHERE id = ? FOR UPDATE`, [id]
+    );
+    if (!existentes.length) {
+      const campos = valores.map(([campo]) => crase(campo));
+      await conn.execute(
+        `INSERT INTO ${tabelaSql} (id, ${campos.join(', ')}) VALUES (?, ${campos.map(() => '?').join(', ')})`,
+        [id, ...valores.map(([, valor]) => valor)]
+      );
+    } else if (!['auditoria', 'movimentacoes_estoque'].includes(tabela)) {
+      const campos = valores.map(([campo]) => crase(campo) + ' = ?').join(', ');
+      await conn.execute(
+        `UPDATE ${tabelaSql} SET ${campos} WHERE id = ?`, [...valores.map(([, valor]) => valor), id]
+      );
     }
   });
 }
 
-export async function executarPull(): Promise<{ atualizados: number }> {
-  // Implementação futura: buscar alterações do MySQL e aplicar no SQLite
-  // Requer controle de versão/timestamp por tabela
-  return { atualizados: 0 };
+function crase(nome: string): string {
+  // Os identificadores já foram conferidos contra as tabelas e colunas do Drizzle.
+  return '\x60' + nome + '\x60';
 }
 
-export async function resolverConflito(
-  conflitoId: number,
-  resolucao: 'local' | 'central' | 'mesclar',
-  dadosMesclados?: Record<string, unknown>
-): Promise<void> {
-  const db = getLocalDb();
-  const conflito = db.prepare('SELECT * FROM sync_conflitos WHERE id = ?').get(conflitoId) as
-    | { id: number; tabela: string; registro_id: string; dados_local: string; dados_central: string }
-    | undefined;
-
-  if (!conflito) throw new Error('Conflito não encontrado');
-
-  let dadosFinais: Record<string, unknown>;
-
-  switch (resolucao) {
-    case 'local':
-      dadosFinais = JSON.parse(conflito.dados_local);
-      break;
-    case 'central':
-      dadosFinais = JSON.parse(conflito.dados_central);
-      break;
-    case 'mesclar':
-      if (!dadosMesclados) throw new Error('Dados mesclados obrigatórios para resolução por mesclagem');
-      dadosFinais = dadosMesclados;
-      break;
-  }
-
-  await runInTransaction(async (conn) => {
-    const sets = Object.keys(dadosFinais).filter(k => k !== 'id').map(k => `\`${k}\` = ?`).join(', ');
-    const valores = [...Object.entries(dadosFinais).filter(([k]) => k !== 'id').map(([, v]) => v), conflito.registro_id] as (string | number | boolean | null)[];
-    await conn.execute(
-      `UPDATE \`${conflito.tabela}\` SET ${sets} WHERE id = ?`,
-      valores
-    );
-  });
-
-  db.prepare('UPDATE sync_conflitos SET status = ?, resolvido_por = ?, resolvido_em = ? WHERE id = ?')
-    .run('resolvido', 'sistema', Date.now(), conflitoId);
+export async function executarPull(): Promise<{ atualizados: number }> {
+  // A aplicação de registros remotos ainda depende da implementação do pull.
+  return { atualizados: 0 };
 }

@@ -15,8 +15,12 @@ export function definirAoSessaoExpirada(funcao: () => void): void {
 
 // pega o window.api (do preload), se existir
 function obterInvocador(): Invocador | null {
-  const real = (window as { api?: { invoke: Invocador } }).api;
-  return real ? (canal, dados) => real.invoke(canal, dados) : null;
+  const real = window.api;
+  return real ? (canal, dados) => {
+    const chamar = Object.hasOwn(real, canal) ? real[canal] : undefined;
+    if (!chamar) return Promise.reject(new Error('Canal não permitido: ' + canal));
+    return chamar(dados);
+  } : null;
 }
 
 // nesses canais "não autenticado" é normal (ainda sem login)

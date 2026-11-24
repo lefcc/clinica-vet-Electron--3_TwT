@@ -1,8 +1,10 @@
 // Jobs agendados com node-cron - alertas, sync, dólar, vacinas
 import cron from 'node-cron';
+import { randomUUID } from 'node:crypto';
 import { config } from '../config/env';
 import { executarPush, getSyncStatus } from '../sync';
 import { getLocalDb } from '../db/local/client';
+import { agoraEmSegundos, diaSaoPaulo } from '../modules/admin/transacao';
 
 let jobsIniciados = false;
 const jobsAtivos: Map<string, cron.ScheduledTask> = new Map();
@@ -52,7 +54,6 @@ export function iniciarJobs(): void {
 
   console.log('[Jobs] Todos os jobs agendados iniciados');
 }
-
 export function pararJobs(): void {
   for (const [nome, job] of jobsAtivos) {
     job.stop();
@@ -87,9 +88,9 @@ async function buscarECotacaoDolar(): Promise<void> {
       const valorCentavos = Math.round(parseFloat(cotacao) * 100);
       const db = getLocalDb();
       db.prepare(`
-        INSERT INTO cotacoes_dolar (valor_centavos, data_cotacao, fonte)
-        VALUES (?, ?, ?)
-      `).run(valorCentavos, Date.now(), 'awesomeapi');
+        INSERT INTO cotacoes_dolar (id, valor_centavos, data_cotacao, fonte)
+        VALUES (?, ?, ?, ?)
+      `).run(randomUUID(), valorCentavos, agoraEmSegundos(), 'awesomeapi');
       console.log(`[Dólar] Cotação atualizada: R$ ${(valorCentavos / 100).toFixed(2)}`);
     }
   } catch (error) {
@@ -118,7 +119,7 @@ async function verificarAlertasEstoque(): Promise<void> {
     const saldo = saldoResult.saldo;
 
     // Calcular consumo médio dos últimos 30 dias
-    const trintaDiasAtras = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const trintaDiasAtras = agoraEmSegundos() - 30 * 24 * 60 * 60;
     const saidas = db.prepare(`
       SELECT COALESCE(SUM(-quantidade), 0) as total_saidas
       FROM movimentacoes_estoque
@@ -143,9 +144,9 @@ async function verificarAlertasEstoque(): Promise<void> {
 
         if (!alertaExistente) {
           db.prepare(`
-            INSERT INTO alertas_estoque (medicamento_id, dias_restantes, saldo_atual, consumo_medio_diario, status)
-            VALUES (?, ?, ?, ?, 'aberto')
-          `).run(med.id, diasRestantes, saldo, consumoMedioDiario);
+            INSERT INTO alertas_estoque (id, medicamento_id, dias_restantes, saldo_atual, consumo_medio_diario, status)
+            VALUES (?, ?, ?, ?, ?, 'aberto')
+          `).run(randomUUID(), med.id, diasRestantes, saldo, consumoMedioDiario);
           console.log(`[Alerta Estoque] Medicamento "${med.nome}" com ${diasRestantes} dias restantes`);
         }
       }
@@ -159,19 +160,20 @@ async function processarLembretesVacina(): Promise<void> {
   const dataLimite = Date.now() + tresDias;
 
   const vacinasProximas = db.prepare(`
-    SELECT v.*, a.nome as animal_nome, a.cliente_id, c.nome as cliente_nome, c.telefone
-    FROM vacinas v
+    SELECT v.*, a.nome as animal_nome, a.cliente_id, c.nome as cliente_nome, c.telefone, vc.nome AS descricao
+    FROM vacinas_aplicacoes v
+    JOIN vacinas_catalogo vc ON vc.id = v.vacina_id
     JOIN animais a ON a.id = v.animal_id
     JOIN clientes c ON c.id = a.cliente_id
     WHERE v.proxima_dose <= ? AND v.ativo = 1 AND a.ativo = 1 AND c.ativo = 1
-  `).all(dataLimite) as Array<{
+  `).all(diaSaoPaulo(new Date(dataLimite))) as Array<{
     id: string;
     animal_id: string;
     animal_nome: string;
     cliente_id: string;
     cliente_nome: string;
     telefone: string | null;
-    proxima_dose: number;
+    proxima_dose: string;
     descricao: string;
   }>;
 
@@ -183,48 +185,15 @@ async function processarLembretesVacina(): Promise<void> {
     `).get(vacina.id);
 
     if (!lembreteExistente && vacina.telefone) {
-      const diasRestantes = Math.ceil((vacina.proxima_dose - Date.now()) / (24 * 60 * 60 * 1000));
+      const diasRestantes = Math.round((Date.parse(vacina.proxima_dose) - Date.parse(diaSaoPaulo(new Date()))) / (24 * 60 * 60 * 1000));
       const mensagem = `Olá ${vacina.cliente_nome}! Lembrete: a vacina "${vacina.descricao}" do ${vacina.animal_nome} vence em ${diasRestantes} dia(s).`;
 
       db.prepare(`
-        INSERT INTO lembretes_vacina (vacina_id, mensagem, telefone, status)
-        VALUES (?, ?, ?, 'pendente')
-      `).run(vacina.id, mensagem, vacina.telefone);
+        INSERT INTO lembretes_vacina (id, vacina_id, mensagem, telefone, status)
+        VALUES (?, ?, ?, ?, 'pendente') ON CONFLICT(vacina_id) DO NOTHING
+      `).run(randomUUID(), vacina.id, mensagem, vacina.telefone);
 
       console.log(`[Vacina] Lembrete criado para ${vacina.cliente_nome} - ${vacina.animal_nome}`);
     }
   }
 }
-
-// Tabelas auxiliares para jobs (criadas via migration)
-/*
-CREATE TABLE IF NOT EXISTS cotacoes_dolar (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  valor_centavos INTEGER NOT NULL,
-  data_cotacao INTEGER NOT NULL,
-  fonte TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS alertas_estoque (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  medicamento_id TEXT NOT NULL,
-  dias_restantes INTEGER NOT NULL,
-  saldo_atual REAL NOT NULL,
-  consumo_medio_diario REAL NOT NULL,
-  status TEXT NOT NULL DEFAULT 'aberto',
-  criado_em INTEGER NOT NULL,
-  resolvido_em INTEGER,
-  FOREIGN KEY (medicamento_id) REFERENCES medicamentos(id)
-);
-
-CREATE TABLE IF NOT EXISTS lembretes_vacina (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  vacina_id TEXT NOT NULL,
-  mensagem TEXT NOT NULL,
-  telefone TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pendente',
-  criado_em INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-  enviado_em INTEGER,
-  FOREIGN KEY (vacina_id) REFERENCES vacinas(id)
-);
-*/

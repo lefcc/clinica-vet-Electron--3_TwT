@@ -1,22 +1,14 @@
-import { z } from 'zod';
+import { LoginEntradaSchema, type Sessao as SessaoDto } from '@clinica-vet/shared';
 import { ErroNegocio } from '../../erros/erro-negocio';
 import type { HashSenha } from './hash-senha';
 import type { ArmazemSessao } from './sessao-em-memoria';
-import type { Perfil } from './tipos';
 import type { RepositorioUsuarios } from './usuario.repository';
 
-// o que o front manda no login (valida antes de ir pro banco)
-export const LoginEntradaSchema = z.object({
-  login: z.string().trim().min(1).max(60),
-  senha: z.string().min(1).max(200),
-});
+export { LoginEntradaSchema };
+export type { SessaoDto };
 
-// o que volta pro front (nunca tem senha_hash)
-export interface SessaoDto {
-  usuarioId: string;
-  nome: string;
-  perfil: Perfil;
-  expiraEm: number;
+interface AuditoriaAuth {
+  executar(acao: 'LOGIN' | 'LOGOUT', sessao: SessaoDto, efetivar: () => void): void;
 }
 
 export class AuthService {
@@ -29,13 +21,16 @@ export class AuthService {
     private readonly sessoes: ArmazemSessao,
     private readonly hash: HashSenha,
     private readonly duracaoSessaoMs: number,
+    private readonly auditoria?: AuditoriaAuth,
   ) {
     this.hashFalso = hash.gerar('senha-que-nao-existe');
   }
 
   async login(entrada: unknown): Promise<SessaoDto> {
     const dados = LoginEntradaSchema.safeParse(entrada);
-    if (!dados.success) throw new ErroNegocio('DADOS_INVALIDOS', 'Informe o usuário e a senha.');
+    if (!dados.success || Buffer.byteLength(dados.data.senha, 'utf8') > 72) {
+      throw new ErroNegocio('DADOS_INVALIDOS', 'Usuário ou senha inválidos.');
+    }
 
     const usuario = this.usuarios.buscarAtivoPorLogin(dados.data.login);
     const hashParaConferir = usuario ? usuario.senhaHash : await this.hashFalso;
@@ -44,9 +39,16 @@ export class AuthService {
     // mesma mensagem pros dois casos: não conta se errou o usuário ou a senha
     if (!usuario || !senhaConfere) throw new ErroNegocio('CREDENCIAIS_INVALIDAS', 'Usuário ou senha inválidos.');
 
-    const sessao: SessaoDto = { usuarioId: usuario.id, nome: usuario.nome, perfil: usuario.perfil, expiraEm: Date.now() + this.duracaoSessaoMs };
+    // A senha e o perfil podem ter mudado durante o bcrypt assíncrono.
+    const atual = this.usuarios.buscarAtivoPorLogin(dados.data.login);
+    if (!atual || atual.id !== usuario.id || atual.senhaHash !== usuario.senhaHash) {
+      throw new ErroNegocio('CREDENCIAIS_INVALIDAS', 'Usuário ou senha inválidos.');
+    }
+    const sessao: SessaoDto = { usuarioId: atual.id, nome: atual.nome, perfil: atual.perfil, expiraEm: Date.now() + this.duracaoSessaoMs };
+    const registrarLogin = () => this.usuarios.registrarLogin(atual.id);
+    if (this.auditoria) this.auditoria.executar('LOGIN', sessao, registrarLogin);
+    else registrarLogin();
     this.sessoes.definir(sessao);
-    this.usuarios.registrarLogin(usuario.id);
     return sessao;
   }
 
@@ -54,7 +56,7 @@ export class AuthService {
   sessaoAtual(): SessaoDto {
     const sessao = this.sessoes.obter();
     if (!sessao) throw new ErroNegocio('NAO_AUTENTICADO', 'Faça login para continuar.');
-    if (Date.now() > sessao.expiraEm) {
+    if (Date.now() >= sessao.expiraEm) {
       this.sessoes.definir(null);
       throw new ErroNegocio('SESSAO_EXPIRADA', 'Sua sessão expirou. Entre novamente.');
     }
@@ -62,6 +64,10 @@ export class AuthService {
   }
 
   sair(): void {
+    const atual = this.sessoes.obter();
     this.sessoes.definir(null);
+    if (this.auditoria && atual && atual.expiraEm > Date.now()) {
+      this.auditoria.executar('LOGOUT', { ...atual, nome: atual.nome ?? 'Usuário' }, () => {});
+    }
   }
 }

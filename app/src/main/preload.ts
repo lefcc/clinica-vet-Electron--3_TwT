@@ -32,19 +32,11 @@ const CANAIS_POR_MODULO: Record<string, string[]> = {
   backup: ['listar', 'criar', 'restaurar']
 };
 
-const CANAIS_PERMITIDOS = new Set(Object.entries(CANAIS_POR_MODULO).flatMap(([modulo, acoes]) => acoes.map((acao) => `${modulo}:${acao}`)));
-
-interface ElectronAPI {
-  invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
-}
-
-const electronAPI: ElectronAPI = {
-  invoke: (channel: string, ...args: unknown[]) => {
-    if (!CANAIS_PERMITIDOS.has(channel)) {
-      return Promise.reject(new Error(`Canal não permitido: ${channel}`));
-    }
-    return ipcRenderer.invoke(channel, ...args);
-  }
-};
+const electronAPI = Object.fromEntries(Object.entries(CANAIS_POR_MODULO).flatMap(([modulo, acoes]) =>
+  acoes.map((acao) => {
+    const canal = `${modulo}:${acao}`;
+    return [canal, (dados?: unknown) => ipcRenderer.invoke(canal, dados)] as const;
+  })
+));
 
 contextBridge.exposeInMainWorld('api', electronAPI);

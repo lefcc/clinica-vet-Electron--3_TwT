@@ -1,5 +1,5 @@
 // registry de handlers IPC: confere sessão e perfil antes de chamar a função
-import { ipcMain, IpcMainInvokeEvent } from 'electron';
+import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { ErroNegocio } from '../erros/erro-negocio';
 import { SessaoEmMemoria } from '../modules/auth/sessao-em-memoria';
 import type { Perfil, SessaoAtiva } from '../modules/auth/tipos';
@@ -9,6 +9,16 @@ export type Sessao = SessaoAtiva;
 
 // a sessão fica só na memória do main (some quando o app fecha)
 export const sessoes = new SessaoEmMemoria();
+const origensPermitidas = new Set<number>();
+
+export function permitirOrigemIpc(id: number, aoDestruir: (remover: () => void) => void): void {
+  origensPermitidas.add(id);
+  aoDestruir(() => origensPermitidas.delete(id));
+}
+
+function origemValida(event: IpcMainInvokeEvent): boolean {
+  return origensPermitidas.has(event.sender.id) && event.senderFrame === event.sender.mainFrame;
+}
 
 export function definirSessao(sessao: Sessao | null) {
   sessoes.definir(sessao);
@@ -23,16 +33,16 @@ function erroParaResposta(error: unknown) {
   if (error instanceof ErroNegocio) {
     return { ok: false, erro: { codigo: error.codigo, mensagem: error.message } };
   }
-  const mensagem = error instanceof Error ? error.message : 'Erro interno do servidor';
-  return { ok: false, erro: { codigo: 'ERRO_INTERNO', mensagem } };
+  return { ok: false, erro: { codigo: 'ERRO_INTERNO', mensagem: 'Não foi possível concluir a operação.' } };
 }
 
 export function registrarHandler<TEntrada, TSaida>(
   canal: string,
   perfisPermitidos: PerfilPermitido[],
-  handler: (event: IpcMainInvokeEvent, dados: TEntrada) => Promise<TSaida>
+  handler: (event: IpcMainInvokeEvent, dados: TEntrada, sessao: Sessao) => Promise<TSaida>
 ) {
   ipcMain.handle(canal, async (event, dados: TEntrada) => {
+    if (!origemValida(event)) return erroParaResposta(new ErroNegocio('SEM_PERMISSAO', 'Origem do pedido inválida.'));
     const sessao = obterSessao();
 
     // tem alguém logado?
@@ -44,7 +54,7 @@ export function registrarHandler<TEntrada, TSaida>(
     }
 
     // a sessão já venceu?
-    if (Date.now() > sessao.expiraEm) {
+    if (Date.now() >= sessao.expiraEm) {
       definirSessao(null);
       return {
         ok: false,
@@ -61,7 +71,7 @@ export function registrarHandler<TEntrada, TSaida>(
     }
 
     try {
-      const resultado = await handler(event, dados);
+      const resultado = await handler(event, dados, sessao);
       return { ok: true, dados: resultado };
     } catch (error) {
       return erroParaResposta(error);
@@ -75,6 +85,7 @@ export function registrarHandlerPublico<TEntrada, TSaida>(
   handler: (event: IpcMainInvokeEvent, dados: TEntrada) => Promise<TSaida>
 ) {
   ipcMain.handle(canal, async (event, dados: TEntrada) => {
+    if (!origemValida(event)) return erroParaResposta(new ErroNegocio('SEM_PERMISSAO', 'Origem do pedido inválida.'));
     try {
       const resultado = await handler(event, dados);
       return { ok: true, dados: resultado };
