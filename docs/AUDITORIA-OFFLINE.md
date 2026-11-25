@@ -1,5 +1,7 @@
 # Varredura do modo offline
 
+Este relatório registra o estado observado antes da implementação do worker. A configuração e as verificações posteriores da Trilha 1 estão no [guia de sincronização e instalação](SINCRONIZACAO.md).
+
 A verificação usou a branch `feat/trilha1-dev-a`, base `82e8c47`, e conferiu a lista de chamadas expostas pelo preload contra os handlers efetivamente registrados pelo Electron. O perfil de teste e os bancos eram isolados.
 
 ## Correções da Trilha 1

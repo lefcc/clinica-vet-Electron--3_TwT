@@ -1,0 +1,5 @@
+**/dist/
+**/node_modules/
+app/release/
+app/src/main/db/local/migrations/meta/
+pnpm-lock.yaml

@@ -8,6 +8,8 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
+    "format": "prettier --write",
+    "format:check": "prettier --check",
     "test": "pnpm -r test",
     "db:generate": "pnpm --filter app db:generate",
     "db:migrate": "pnpm --filter app db:migrate",
@@ -16,6 +18,7 @@
   },
   "devDependencies": {
     "marked": "^18.2.1",
+    "prettier": "3.9.10",
     "puppeteer": "^25.18.1",
     "typescript": "^5.5.0"
   },

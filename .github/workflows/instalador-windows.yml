@@ -1,0 +1,55 @@
+name: Validação da Trilha 1
+
+on:
+  push:
+    branches: [feat/trilha1-dev-a]
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'shared/**'
+      - 'scripts/verificar-instalador.mjs'
+      - 'docker-compose.yml'
+      - '.github/workflows/instalador-windows.yml'
+      - 'pnpm-*.yaml'
+      - '.npmrc'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: instalador-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mysql-dev:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Aplicar migrations no MySQL 8.4 de desenvolvimento
+        run: |
+          docker compose up -d --wait --wait-timeout 90 mysql
+          tabelas=$(docker compose exec -T -e MYSQL_PWD=clinica123 mysql mysql --user=clinica --database=clinica_vet --batch --skip-column-names --execute 'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()')
+          test "$tabelas" = 24
+
+  instalador:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+      - name: Instalar dependências do lockfile
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: npm install -g pnpm@9.6.0
+      - name: Gerar instalador
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm --filter @clinica-vet/app exec node -e "require(require.resolve('electron/install.js'))"
+          pnpm --filter @clinica-vet/app build --win nsis --x64 --publish never
+      - name: Instalar, autenticar e fazer backup offline
+        run: node scripts/verificar-instalador.mjs

@@ -1,6 +1,6 @@
 // Schema Drizzle para MySQL central
 // Mesmas tabelas do SQLite (exceto sync_outbox, sync_estado, sync_conflitos)
-import { mysqlTable, varchar, mysqlEnum, text, int, decimal, timestamp, date, index, uniqueIndex, boolean, json } from 'drizzle-orm/mysql-core';
+import { mysqlTable, varchar, mysqlEnum, text, int, bigint, decimal, timestamp, date, index, uniqueIndex, boolean, json } from 'drizzle-orm/mysql-core';
 
 export const colaboradores = mysqlTable('colaboradores', {
   id: varchar('id', { length: 36 }).primaryKey(),
@@ -113,6 +113,22 @@ export type Medicamento = typeof medicamentos.$inferSelect;
 export type NovoMedicamento = typeof medicamentos.$inferInsert;
 export type Fornecedor = typeof fornecedores.$inferSelect;
 export type NovoFornecedor = typeof fornecedores.$inferInsert;
+
+export const syncRelogio = mysqlTable('sync_relogio', {
+  id: int('id').primaryKey(),
+  inicializado: boolean('inicializado').notNull().default(false)
+});
+
+export const syncMudancas = mysqlTable('sync_mudancas', {
+  versao: bigint('versao', { mode: 'number', unsigned: true }).primaryKey().autoincrement(),
+  operacaoId: varchar('operacao_id', { length: 64 }).notNull().unique(),
+  tabela: varchar('tabela', { length: 64 }).notNull(),
+  registroId: varchar('registro_id', { length: 36 }).notNull(),
+  dados: json('dados').notNull(),
+  sincronizadoEm: timestamp('sincronizado_em', { fsp: 6 }).notNull().defaultNow()
+}, (table) => ({
+  registro: index('idx_sync_mudancas_registro').on(table.tabela, table.registroId, table.versao)
+}));
 
 export const agendamentos = mysqlTable('agendamentos', {
   id: varchar('id', { length: 36 }).primaryKey().notNull(),

@@ -11,6 +11,9 @@ importers:
       marked:
         specifier: ^18.2.1
         version: 18.2.1
+      prettier:
+        specifier: 3.9.10
+        version: 3.9.10
       puppeteer:
         specifier: ^25.18.1
         version: 25.18.1(yauzl@2.10.0)
@@ -35,12 +38,6 @@ importers:
       drizzle-orm:
         specifier: ^0.33.0
         version: 0.33.0(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)(mysql2@3.24.6(@types/node@22.20.5))
-      electron:
-        specifier: ^30.0.0
-        version: 30.5.1
-      electron-rebuild:
-        specifier: ^3.2.9
-        version: 3.2.9
       mysql2:
         specifier: ^3.11.0
         version: 3.24.6(@types/node@22.20.5)
@@ -66,9 +63,15 @@ importers:
       drizzle-kit:
         specifier: ^0.24.0
         version: 0.24.2
+      electron:
+        specifier: 30.5.1
+        version: 30.5.1
       electron-builder:
         specifier: ^24.13.0
         version: 24.13.3(electron-builder-squirrel-windows@24.13.3(dmg-builder@24.13.3))
+      electron-rebuild:
+        specifier: ^3.2.9
+        version: 3.2.9
       eslint:
         specifier: ^9.0.0
         version: 9.39.5
@@ -2306,6 +2309,11 @@ packages:
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
+
+  prettier@3.9.10:
+    resolution: {integrity: sha512-skGHTH1Yb9QvaTC4hWnRTzEYtCpApF0UMBPz+t/0ZPzP8ihefo/btKd+QA7pUE0fEwA1SbS/NmhyEcstdXOIdA==}
+    engines: {node: '>=14'}
+    hasBin: true
 
   process-nextick-args@2.0.1:
     resolution: {integrity: sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==}
@@ -4988,6 +4996,8 @@ snapshots:
       tunnel-agent: 0.6.0
 
   prelude-ls@1.2.1: {}
+
+  prettier@3.9.10: {}
 
   process-nextick-args@2.0.1: {}
 

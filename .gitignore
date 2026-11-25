@@ -17,6 +17,10 @@ app/release/
 .env.local
 .env.*.local
 !/.env.example
+mysql.credenciais
+mysql.credenciais.*
+*.key
+*.pem
 
 # IDE
 .vscode/
@@ -38,6 +42,8 @@ coverage/
 
 # Database
 *.sqlite
+*.sqlite-wal
+*.sqlite-shm
 *.sqlite3
 *.db
 

@@ -23,6 +23,8 @@ describe('EsquemaLocal', () => {
     const tabelas = Object.values(local).filter((tabela) => is(tabela, SQLiteTable));
     const tabelasCentrais = new Map(Object.values(central).filter((tabela) => is(tabela, MySqlTable))
       .map((tabela) => [String(getTableName(tabela)), tabela]));
+    expect(tabelasCentrais.delete('sync_mudancas')).toBe(true);
+    expect(tabelasCentrais.delete('sync_relogio')).toBe(true);
     const tabelasSoLocais = ['sync_outbox', 'sync_estado', 'sync_conflitos'];
     expect(tabelas).toHaveLength(25);
     expect(tabelasCentrais.size).toBe(22);

@@ -1,8 +1,7 @@
-// Jobs agendados com node-cron - alertas, sync, dólar, vacinas
+// Jobs agendados com node-cron - alertas, dólar, vacinas
 import cron from 'node-cron';
 import { randomUUID } from 'node:crypto';
 import { config } from '../config/env';
-import { executarPush, getSyncStatus } from '../sync';
 import { getLocalDb } from '../db/local/client';
 import { agoraEmSegundos, diaSaoPaulo } from '../modules/admin/transacao';
 
@@ -12,18 +11,6 @@ const jobsAtivos: Map<string, cron.ScheduledTask> = new Map();
 export function iniciarJobs(): void {
   if (jobsIniciados) return;
   jobsIniciados = true;
-
-  // Sync periódica
-  const syncIntervalMin = Math.max(1, Math.floor(config.sync.intervalMs / 60000));
-  agendarJob('sync', `*/${syncIntervalMin} * * * *`, async () => {
-    if (!getSyncStatus().emAndamento) {
-      try {
-        await executarPush();
-      } catch (error) {
-        console.error('[Job Sync] Erro:', error);
-      }
-    }
-  });
 
   // Cotação do dólar (diário às 9h)
   agendarJob('dolar', '0 9 * * *', async () => {

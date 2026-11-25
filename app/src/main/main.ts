@@ -1,7 +1,8 @@
 // ponto de entrada do processo principal (main) do Electron
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, net } from 'electron';
 import * as path from 'path';
 import { config } from './config/env';
+import { habilitarMysqlInstalado, provisionarMysql } from './config/mysql-local';
 import { EsquemaLocal } from './db/local/esquema-local';
 import { obterConexaoLocal } from './db/local/client';
 import { SeedUsuarioExemplo } from './db/local/seed-usuario-exemplo';
@@ -14,7 +15,9 @@ import { runInTransaction } from './modules/admin/transacao';
 import { AuthService } from './modules/auth/auth.service';
 import { HashSenha } from './modules/auth/hash-senha';
 import { UsuarioRepository } from './modules/auth/usuario.repository';
-import { getSyncStatus } from './sync';
+import { aoReceberMudanca, executarCicloSync, getSyncStatus } from './sync';
+import { iniciarAgendadorSync } from './sync/agendador';
+import { closeCentralPool } from './db/central/client';
 
 class Aplicacao {
   async iniciar(): Promise<void> {
@@ -23,6 +26,24 @@ class Aplicacao {
       return;
     }
     await app.whenReady();
+    if (process.argv.includes('--configurar-mysql')) {
+      try {
+        provisionarMysql();
+        app.exit(0);
+      } catch {
+        dialog.showErrorBox('Configuração MySQL', 'Confira os campos da conexão e a disponibilidade do cofre de credenciais.');
+        app.exit(1);
+      }
+      return;
+    }
+
+    if (app.isPackaged) {
+      try {
+        config.sync.habilitado = habilitarMysqlInstalado();
+      } catch {
+        dialog.showErrorBox('Configuração MySQL', 'As credenciais locais não puderam ser abertas. O aplicativo continuará no modo local.');
+      }
+    }
 
     // primeiro o banco (e o usuário de exemplo), depois a janela com a tela de login
     if (!(await this.prepararBanco())) {
@@ -47,11 +68,11 @@ class Aplicacao {
       new EsquemaLocal(conexao).aplicar();
 
       const hash = new HashSenha(Math.max(10, config.bcryptCost));
-      const usuarios = new UsuarioRepository(conexao);
+      const usuarios = new UsuarioRepository(conexao, config.sync.habilitado);
 
-      const dados = SeedUsuarioExemplo.escolherDados(config.usuarioExemplo, !app.isPackaged);
+      const dados = SeedUsuarioExemplo.escolherDados(config.usuarioExemplo, !app.isPackaged && !config.sync.habilitado);
       const resultado = await new SeedUsuarioExemplo(usuarios, hash).executar(dados);
-      if (resultado === 'sem-dados') {
+      if (resultado === 'sem-dados' && !config.sync.habilitado) {
         dialog.showErrorBox('Primeiro acesso', 'Configure a conta do administrador local antes de iniciar o aplicativo.');
         return false;
       }
@@ -76,6 +97,26 @@ class Aplicacao {
       const cronometro = setInterval(backupAgendado, 60_000);
       app.once('before-quit', () => clearInterval(cronometro));
       backupAgendado();
+      if (config.sync.habilitado) {
+        aoReceberMudanca(({ tabela, registro_id }) => {
+          const sessao = sessoes.obter();
+          if (!sessao) return;
+          if ((tabela === 'usuarios' && registro_id === sessao.usuarioId)
+            || (tabela === 'colaboradores' && usuarios.pertenceAoColaborador(sessao.usuarioId, registro_id))) {
+            sessoes.definir(null);
+          }
+        });
+        const parar = iniciarAgendadorSync({
+          online: () => net.isOnline(),
+          executar: executarCicloSync,
+          intervaloMs: config.sync.intervalMs,
+          aoErro: () => console.warn('O banco central está indisponível. Os dados locais permanecem disponíveis.')
+        });
+        app.once('before-quit', () => {
+          parar();
+          void closeCentralPool().catch(() => undefined);
+        });
+      }
       return true;
     } catch (erro) {
       const detalhe = erro instanceof Error ? erro.message : String(erro);

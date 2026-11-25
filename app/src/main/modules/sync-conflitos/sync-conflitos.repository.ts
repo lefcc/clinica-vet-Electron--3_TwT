@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 import type { Conflito } from '@clinica-vet/shared';
 import type { BancoSql } from '../../db/banco-sql';
 import { colunasSincronizaveis } from '../../db/local/tabelas-sincronizaveis';
@@ -27,6 +28,10 @@ function dadosPublicos(dados: Record<string, unknown>): Record<string, unknown> 
 }
 
 export class SyncConflitosRepository {
+  confirmarAgendamento(id: string): void {
+    this.banco.prepare('UPDATE agendamentos SET confirmado = 1 WHERE id = ?').run(id);
+  }
+
   constructor(private readonly banco: BancoSql) {}
 
   listar(): Conflito[] {
@@ -47,6 +52,26 @@ export class SyncConflitosRepository {
     ).get(id) as LinhaConflito | undefined;
     if (!linha) throw new ErroNegocio('CONFLITO_NAO_ENCONTRADO', 'Conflito aberto não encontrado.');
     return linha;
+  }
+
+  abertoPara(tabela: string, registroId: string): number | undefined {
+    const linha = this.banco.prepare(
+      "SELECT id FROM sync_conflitos WHERE tabela = ? AND registro_id = ? AND status = 'aberto' ORDER BY id DESC LIMIT 1"
+    ).get(tabela, registroId) as { id: number } | undefined;
+    return linha?.id;
+  }
+
+  abrir(tabela: string, registroId: string, tipo: string, local: object, central: object): number {
+    const anterior = this.abertoPara(tabela, registroId);
+    const dados = [tipo, JSON.stringify(local), JSON.stringify(central)];
+    if (anterior !== undefined) {
+      this.banco.prepare('UPDATE sync_conflitos SET tipo = ?, dados_local = ?, dados_central = ? WHERE id = ?')
+        .run(...dados, anterior);
+      return anterior;
+    }
+    this.banco.prepare(`INSERT INTO sync_conflitos (tabela, registro_id, tipo, dados_local, dados_central)
+      VALUES (?, ?, ?, ?, ?)`).run(tabela, registroId, ...dados);
+    return this.abertoPara(tabela, registroId)!;
   }
 
   lerDados(json: string): Record<string, unknown> {
@@ -109,6 +134,29 @@ export class SyncConflitosRepository {
     this.banco.prepare(
       "UPDATE sync_conflitos SET status = 'resolvido', resolvido_por = ?, resolvido_em = ? WHERE id = ?"
     ).run(usuarioId, agoraEmSegundos(), id);
+  }
+
+  aceitarCentralSemVersao(
+    tabela: string, id: string, tipo: string, atual: Record<string, unknown> | undefined, usuarioId: string | null
+  ): boolean {
+    if (!atual) return false;
+    if (tabela === 'agendamentos' && tipo === 'AGENDA_SOBREPOSTA') {
+      this.banco.prepare("UPDATE agendamentos SET status = 'CANCELADO', ativo = 0, atualizado_em = ? WHERE id = ?")
+        .run(agoraEmSegundos(), id);
+      return true;
+    }
+    if (tabela === 'movimentacoes_estoque' && tipo === 'ESTOQUE_INSUFICIENTE' &&
+      atual.consulta_id === null && typeof atual.quantidade === 'number' && usuarioId) {
+      // O lançamento rejeitado nunca entrou no central. Compensa localmente sem apagar o histórico.
+      const estornoId = randomUUID();
+      const agora = agoraEmSegundos();
+      this.aplicarCentral(tabela, estornoId, {
+        ...atual, id: estornoId, tipo: 'AJUSTE', quantidade: -atual.quantidade, usuario_id: usuarioId,
+        motivo: 'Estorno local do movimento rejeitado ' + id, criado_em: agora, atualizado_em: agora
+      });
+      return true;
+    }
+    return false;
   }
 
   validarVeterinarios(): void {
