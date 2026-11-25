@@ -9,6 +9,7 @@ import { SeedUsuarioExemplo } from './db/local/seed-usuario-exemplo';
 import { AuthIpc } from './ipc/auth.ipc';
 import { permitirOrigemIpc, sessoes } from './ipc/registry';
 import { criarTrilha1, registrarTrilha1 } from './ipc/trilha1.ipc';
+import { registrarTrilha3Ipc } from './ipc/trilha3.ipc';
 import { registrarEstadoSync } from './ipc/sync.ipc';
 import { OutboxRepository } from './modules/admin/outbox.repository';
 import { runInTransaction } from './modules/admin/transacao';
@@ -90,6 +91,7 @@ class Aplicacao {
       });
       new AuthIpc(auth).registrar();
       registrarTrilha1(trilha1, () => getSyncStatus().emAndamento);
+      registrarTrilha3Ipc(conexao, config.dolar.apiUrl);
       registrarEstadoSync(new OutboxRepository(conexao), getSyncStatus);
       const backupAgendado = () => void trilha1.backup.executarAgendado().catch(() => {
         console.error('Não foi possível executar o backup automático.');
