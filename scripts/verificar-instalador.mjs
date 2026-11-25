@@ -66,10 +66,18 @@ try {
     timeout: 15_000
   });
   const pagina = await tela.page();
-  await pagina.setOfflineMode(true);
+  const cdp = await pagina.createCDPSession();
+  // O Chromium do Electron 30 usa o comando original do CDP.
+  await cdp.send('Network.enable');
+  await cdp.send('Network.emulateNetworkConditions', {
+    offline: true,
+    latency: 0,
+    downloadThroughput: 0,
+    uploadThroughput: 0
+  });
   const usuario = 'input[name="login"]';
   await pagina.waitForSelector(usuario, { timeout: 10_000 });
-  assert.equal(await pagina.evaluate(() => navigator.onLine), false);
+  await pagina.waitForFunction(() => !navigator.onLine, { timeout: 10_000 });
   await pagina.type(usuario, login);
   await pagina.type('input[name="senha"]', senha);
   await pagina.click('.login__form button[type="submit"]');

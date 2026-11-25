@@ -40,6 +40,7 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '24'
+          package-manager-cache: false
       - name: Instalar dependências do lockfile
         shell: pwsh
         working-directory: ${{ runner.temp }}
