@@ -28,7 +28,7 @@ export interface AgendamentoComRelacoes {
   cliente_nome: string;
   veterinario_id: string;
   veterinario_nome: string;
-  inicio: number; // timestamp Unix (segundos)
+  inicio: number | string; // timestamp Unix (segundos) ou ISO string UTC
   duracao_min: number;
   motivo: string | null;
   status: 'AGENDADO' | 'CONFIRMADO' | 'REALIZADO' | 'CANCELADO';
@@ -109,47 +109,11 @@ interface LinhaAgendamento {
   atualizado_em: number;
 }
 
-interface LinhaAnimal {
-  id: string;
-  nome: string;
-  cliente_id: string;
-}
-
-interface LinhaCliente {
-  id: string;
-  nome: string;
-}
-
 interface LinhaColaborador {
   id: string;
   nome: string;
   crmv: string | null;
   perfil: string;
-}
-
-function mapearAgendamento(
-  ag: LinhaAgendamento,
-  animal: LinhaAnimal | undefined,
-  cliente: LinhaCliente | undefined,
-  vet: LinhaColaborador | undefined,
-): AgendamentoComRelacoes {
-  return {
-    id: ag.id,
-    cliente_id: ag.cliente_id,
-    animal_id: ag.animal_id,
-    animal_nome: animal?.nome || '—',
-    cliente_nome: cliente?.nome || '—',
-    veterinario_id: ag.veterinario_id,
-    veterinario_nome: vet?.nome || '—',
-    inicio: ag.inicio,
-    duracao_min: ag.duracao_min,
-    motivo: ag.motivo,
-    status: ag.status as AgendamentoComRelacoes['status'],
-    confirmado: Boolean(ag.confirmado),
-    ativo: Boolean(ag.ativo),
-    criadoEm: ag.criado_em,
-    atualizadoEm: ag.atualizado_em,
-  };
 }
 
 export class AgendaRepository implements RepositorioAgendamentos {
@@ -189,13 +153,13 @@ export class AgendaRepository implements RepositorioAgendamentos {
 
     return linhas.map((linha) => ({
       id: linha.id,
-      cliente_id: linha.cliente_id,
+      cliente_id: linha.animal_cliente_id ?? linha.cliente_id ?? null,
       animal_id: linha.animal_id,
       animal_nome: linha.animal_nome,
       cliente_nome: linha.cliente_nome,
       veterinario_id: linha.veterinario_id,
       veterinario_nome: linha.veterinario_nome,
-      inicio: linha.inicio,
+      inicio: new Date(linha.inicio * 1000).toISOString(),
       duracao_min: linha.duracao_min,
       motivo: linha.motivo,
       status: linha.status as AgendamentoComRelacoes['status'],
@@ -233,13 +197,13 @@ export class AgendaRepository implements RepositorioAgendamentos {
 
     return {
       id: linha.id,
-      cliente_id: linha.cliente_id,
+      cliente_id: linha.animal_cliente_id ?? linha.cliente_id ?? null,
       animal_id: linha.animal_id,
       animal_nome: linha.animal_nome,
       cliente_nome: linha.cliente_nome,
       veterinario_id: linha.veterinario_id,
       veterinario_nome: linha.veterinario_nome,
-      inicio: linha.inicio,
+      inicio: new Date(linha.inicio * 1000).toISOString(),
       duracao_min: linha.duracao_min,
       motivo: linha.motivo,
       status: linha.status as AgendamentoComRelacoes['status'],
@@ -253,7 +217,11 @@ export class AgendaRepository implements RepositorioAgendamentos {
   listarVeterinarios(): Veterinario[] {
     const linhas = this.banco
       .prepare(
-        `SELECT id, nome, crmv FROM colaboradores WHERE ativo = 1 AND perfil = 'VETERINARIO' ORDER BY nome ASC`,
+        `SELECT c.id, c.nome, c.crmv
+         FROM colaboradores c
+         LEFT JOIN usuarios u ON u.colaborador_id = c.id
+         WHERE c.ativo = 1 AND (u.perfil = 'VETERINARIO' OR c.crmv IS NOT NULL)
+         ORDER BY c.nome ASC`,
       )
       .all() as LinhaColaborador[];
 
@@ -267,7 +235,11 @@ export class AgendaRepository implements RepositorioAgendamentos {
 
   verificarVeterinarioExiste(veterinarioId: string): boolean {
     const linha = this.banco
-      .prepare("SELECT 1 FROM colaboradores WHERE id = ? AND ativo = 1 AND perfil = 'VETERINARIO'")
+      .prepare(
+        `SELECT 1 FROM colaboradores c
+         LEFT JOIN usuarios u ON u.colaborador_id = c.id
+         WHERE c.id = ? AND c.ativo = 1 AND (u.perfil = 'VETERINARIO' OR c.crmv IS NOT NULL)`,
+      )
       .get(veterinarioId);
     return !!linha;
   }
@@ -294,11 +266,10 @@ export class AgendaRepository implements RepositorioAgendamentos {
     return runInTransaction((db) => {
       // Inserir agendamento
       db.prepare(
-        `INSERT INTO agendamentos (id, cliente_id, animal_id, veterinario_id, inicio, duracao_min, motivo, status, confirmado, ativo, criado_em, atualizado_em)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'AGENDADO', 0, 1, ?, ?)`,
+        `INSERT INTO agendamentos (id, animal_id, veterinario_id, inicio, duracao_min, motivo, status, confirmado, ativo, criado_em, atualizado_em)
+         VALUES (?, ?, ?, ?, ?, ?, 'AGENDADO', 0, 1, ?, ?)`,
       ).run(
         id,
-        dados.clienteId ?? null,
         dados.animalId,
         dados.veterinarioId,
         dados.inicio,
@@ -342,14 +313,13 @@ export class AgendaRepository implements RepositorioAgendamentos {
       const valores: unknown[] = [];
 
       const mapaCampos: Record<string, string> = {
-        clienteId: 'cliente_id',
         animalId: 'animal_id',
         veterinarioId: 'veterinario_id',
         duracaoMin: 'duracao_min',
       };
 
       for (const [chave, valor] of Object.entries(dados)) {
-        if (valor !== undefined && chave !== 'id' && chave !== 'criadoEm') {
+        if (valor !== undefined && chave !== 'id' && chave !== 'criadoEm' && chave !== 'clienteId') {
           const coluna = mapaCampos[chave] || chave.replace(/([A-Z])/g, '_$1').toLowerCase();
           campos.push(`${coluna} = ?`);
           valores.push(valor);
@@ -365,12 +335,15 @@ export class AgendaRepository implements RepositorioAgendamentos {
 
       // Gravar na sync_outbox
       const atualizado = this.obter(id)!;
+      const inicioSeg = typeof atualizado.inicio === 'string'
+        ? Math.floor(new Date(atualizado.inicio).getTime() / 1000)
+        : atualizado.inicio;
       const dadosSync: DadosSyncAgendamento = {
         id: atualizado.id,
         cliente_id: atualizado.cliente_id,
         animal_id: atualizado.animal_id,
         veterinario_id: atualizado.veterinario_id,
-        inicio: atualizado.inicio,
+        inicio: inicioSeg,
         duracao_min: atualizado.duracao_min,
         motivo: atualizado.motivo,
         status: atualizado.status,
@@ -392,6 +365,9 @@ export class AgendaRepository implements RepositorioAgendamentos {
     const agora = Math.floor(Date.now() / 1000);
     const existente = this.obter(id);
     if (!existente) throw new Error('Agendamento não encontrado');
+    const inicioExistenteSeg = typeof existente.inicio === 'string'
+      ? Math.floor(new Date(existente.inicio).getTime() / 1000)
+      : existente.inicio;
 
     runInTransaction((db) => {
       db.prepare("UPDATE agendamentos SET status = 'CANCELADO', atualizado_em = ? WHERE id = ?").run(agora, id);
@@ -402,7 +378,7 @@ export class AgendaRepository implements RepositorioAgendamentos {
         cliente_id: existente.cliente_id,
         animal_id: existente.animal_id,
         veterinario_id: existente.veterinario_id,
-        inicio: existente.inicio,
+        inicio: inicioExistenteSeg,
         duracao_min: existente.duracao_min,
         motivo: existente.motivo,
         status: 'CANCELADO',

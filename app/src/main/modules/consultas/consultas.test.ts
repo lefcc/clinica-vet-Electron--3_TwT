@@ -236,7 +236,7 @@ describe('ConsultasService', () => {
       service.criar(consultaValida);
 
       const resultado = serviceAtendente.listar({ pagina: 1, tamanho: 10 });
-      expect(resultado.itens[0].diagnostico).toBeNull();
+      expect(resultado.itens[0].diagnostico).toBeUndefined();
     });
 
     it('como MASTER/VETERINARIO inclui diagnóstico', () => {
@@ -261,7 +261,7 @@ describe('ConsultasService', () => {
       const serviceAtendente = new ConsultasService(repo, sessaoAtendente);
       const criada = service.criar(consultaValida);
       const obtida = serviceAtendente.obter({ id: criada.id });
-      expect(obtida.diagnostico).toBeNull();
+      expect(obtida.diagnostico).toBeUndefined();
     });
 
     it('lança erro se consulta não existe', () => {
@@ -348,7 +348,7 @@ describe('ConsultasService', () => {
       service.criar(consultaValida);
 
       const historico = serviceAtendente.historicoAnimal({ animal_id: animalId });
-      expect(historico[0].diagnostico).toBeNull();
+      expect(historico[0].diagnostico).toBeUndefined();
     });
   });
 });

@@ -37,10 +37,6 @@ export function abrirModal(opcoes: OpcoesModal): ModalAberto {
     dialogo.remove();
     aoFechar?.();
   });
-  // clicar no fundo escuro também fecha
-  dialogo.addEventListener('click', (evento) => {
-    if (evento.target === dialogo) fechar();
-  });
 
   document.body.append(dialogo);
   dialogo.showModal();

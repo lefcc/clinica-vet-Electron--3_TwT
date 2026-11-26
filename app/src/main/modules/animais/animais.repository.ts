@@ -141,10 +141,6 @@ function mapearAnimalComCliente(animal: LinhaAnimal, cliente: LinhaCliente | und
   };
 }
 
-function normalizarBusca(texto: string): string {
-  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-}
-
 export class AnimalRepository implements RepositorioAnimais {
   constructor(private readonly banco: BancoSql) {}
 

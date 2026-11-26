@@ -4,28 +4,6 @@
   "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
-    },
-    "./agendamentos": {
-      "types": "./dist/agendamentos.d.ts",
-      "import": "./dist/agendamentos.js",
-      "require": "./dist/agendamentos.js"
-    },
-    "./consultas": {
-      "types": "./dist/consultas.d.ts",
-      "import": "./dist/consultas.js",
-      "require": "./dist/consultas.js"
-    },
-    "./perfil": {
-      "types": "./dist/perfil.d.ts",
-      "import": "./dist/perfil.js",
-      "require": "./dist/perfil.js"
-    }
-  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

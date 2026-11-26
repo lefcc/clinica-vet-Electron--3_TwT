@@ -39,9 +39,9 @@ export interface ConsultaComRelacoes {
   cliente_nome: string;
   veterinario_id: string;
   veterinario_nome: string;
-  data: number; // timestamp Unix (segundos)
+  data: number | string; // timestamp Unix (segundos) ou ISO UTC
   anamnese: string | null;
-  diagnostico: string | null;
+  diagnostico?: string | null;
   observacoes: string | null;
   prescricoes: Prescricao[];
   ativo: boolean;
@@ -84,7 +84,7 @@ export interface NovoLote {
 export interface LoteParaBaixa {
   id: string;
   numero: string;
-  validade: number;
+  validade: number | string;
   saldo: number;
 }
 
@@ -176,25 +176,6 @@ interface LinhaColaborador {
   nome: string;
 }
 
-interface LinhaMedicamento {
-  id: string;
-  nome: string;
-  unidade: string;
-}
-
-interface LinhaLote {
-  id: string;
-  medicamento_id: string;
-  numero: string;
-  validade: number;
-  quantidade_inicial: number;
-}
-
-interface LinhaMovimento {
-  lote_id: string | null;
-  quantidade: number;
-}
-
 function mapearConsulta(
   consulta: LinhaConsulta,
   animal: LinhaAnimal | undefined,
@@ -210,7 +191,7 @@ function mapearConsulta(
     cliente_nome: cliente?.nome || '—',
     veterinario_id: consulta.veterinario_id,
     veterinario_nome: vet?.nome || '—',
-    data: consulta.data,
+    data: new Date(consulta.data * 1000).toISOString(),
     anamnese: consulta.anamnese,
     diagnostico: consulta.diagnostico,
     observacoes: consulta.observacoes,
@@ -228,10 +209,6 @@ function mapearConsulta(
     criadoEm: consulta.criado_em,
     atualizadoEm: consulta.atualizado_em,
   };
-}
-
-function normalizarBusca(texto: string): string {
-  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
 export class ConsultasRepository implements RepositorioConsultas {
@@ -284,9 +261,9 @@ export class ConsultasRepository implements RepositorioConsultas {
       const prescricoes = this.banco
         .prepare(
           `SELECT p.*, m.nome AS medicamento_nome, m.unidade
-           FROM prescricoes p
+           FROM prescricoes_consulta p
            JOIN medicamentos m ON m.id = p.medicamento_id
-           WHERE p.consulta_id = ?
+           WHERE p.consulta_id = ? AND p.ativo = 1
            ORDER BY p.criado_em ASC`,
         )
         .all(linha.id) as (LinhaPrescricao & { medicamento_nome: string; unidade: string })[];
@@ -330,9 +307,9 @@ export class ConsultasRepository implements RepositorioConsultas {
     const prescricoes = this.banco
       .prepare(
         `SELECT p.*, m.nome AS medicamento_nome, m.unidade
-         FROM prescricoes p
+         FROM prescricoes_consulta p
          JOIN medicamentos m ON m.id = p.medicamento_id
-         WHERE p.consulta_id = ?
+         WHERE p.consulta_id = ? AND p.ativo = 1
          ORDER BY p.criado_em ASC`,
       )
       .all(id) as (LinhaPrescricao & { medicamento_nome: string; unidade: string })[];
@@ -367,9 +344,9 @@ export class ConsultasRepository implements RepositorioConsultas {
       const prescricoes = this.banco
         .prepare(
           `SELECT p.*, m.nome AS medicamento_nome, m.unidade
-           FROM prescricoes p
+           FROM prescricoes_consulta p
            JOIN medicamentos m ON m.id = p.medicamento_id
-           WHERE p.consulta_id = ?
+           WHERE p.consulta_id = ? AND p.ativo = 1
            ORDER BY p.criado_em ASC`,
         )
         .all(linha.id) as (LinhaPrescricao & { medicamento_nome: string; unidade: string })[];
@@ -392,23 +369,24 @@ export class ConsultasRepository implements RepositorioConsultas {
     // Buscar lotes com saldo disponível, ordenados por validade (FEFO - First Expired First Out)
     const lotes = this.banco
       .prepare(
-        `SELECT l.id, l.numero, l.validade, l.quantidade_inicial,
-                COALESCE(SUM(CASE WHEN m.tipo = 'ENTRADA' AND m.lote_id = l.id THEN m.quantidade ELSE 0 END), 0) as entradas,
-                COALESCE(SUM(CASE WHEN m.tipo = 'SAIDA' AND m.lote_id = l.id THEN -m.quantidade ELSE 0 END), 0) as saidas
-         FROM estoque_lotes l
-         LEFT JOIN estoque_movimentacoes m ON m.lote_id = l.id
-         WHERE l.medicamento_id = ? AND l.validade >= date('now')
-         GROUP BY l.id, l.numero, l.validade, l.quantidade_inicial
-         HAVING (l.quantidade_inicial + entradas - saidas) > 0
-         ORDER BY l.validade ASC`,
+        `SELECT l.id,
+                l.numero,
+                l.validade,
+                COALESCE(SUM(CASE WHEN m.ativo = 1 THEN m.quantidade ELSE 0 END), 0) AS saldo
+         FROM lotes_estoque l
+         LEFT JOIN movimentacoes_estoque m ON m.lote_id = l.id
+         WHERE l.medicamento_id = ? AND l.ativo = 1 AND l.validade >= date('now')
+         GROUP BY l.id, l.numero, l.validade, l.criado_em
+         HAVING COALESCE(SUM(CASE WHEN m.ativo = 1 THEN m.quantidade ELSE 0 END), 0) > 0
+         ORDER BY l.validade ASC, l.criado_em ASC`,
       )
-      .all(medicamentoId) as (LinhaLote & { entradas: number; saidas: number })[];
+      .all(medicamentoId) as Array<{ id: string; numero: string; validade: string; saldo: number }>;
 
     const lotesComSaldo: LoteParaBaixa[] = [];
     let somaSaldo = 0;
 
     for (const lote of lotes) {
-      const saldo = lote.quantidade_inicial + lote.entradas - lote.saidas;
+      const saldo = Number(lote.saldo);
       if (saldo > 0) {
         lotesComSaldo.push({
           id: lote.id,
@@ -433,17 +411,21 @@ export class ConsultasRepository implements RepositorioConsultas {
     const id = randomUUID();
 
     return runInTransaction((db) => {
+      const usuarioReal = db
+        .prepare('SELECT id FROM usuarios WHERE id = ? OR colaborador_id = ? LIMIT 1')
+        .get(usuarioId, usuarioId) as { id: string } | undefined;
+      const usuarioMovId = usuarioReal?.id ?? usuarioId;
+
       // Inserir consulta
       db.prepare(
-        `INSERT INTO consultas (id, agendamento_id, animal_id, veterinario_id, data, anamnese, diagnostico, observacoes, ativo, criado_em, atualizado_em)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+        `INSERT INTO consultas (id, animal_id, veterinario_id, data, anamnese, diagnostico, observacoes, ativo, criado_em, atualizado_em)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       ).run(
         id,
-        dados.agendamentoId ?? null,
         dados.animalId,
         dados.veterinarioId,
         dados.data,
-        dados.anamnese ?? null,
+        dados.anamnese ?? '',
         dados.diagnostico ?? null,
         dados.observacoes ?? null,
         agora,
@@ -460,9 +442,23 @@ export class ConsultasRepository implements RepositorioConsultas {
 
           // Inserir prescrição
           db.prepare(
-            `INSERT INTO prescricoes (id, consulta_id, medicamento_id, quantidade, posologia, criado_em)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-          ).run(prescId, id, presc.medicamentoId, presc.quantidade, presc.posologia ?? null, agora);
+            `INSERT INTO prescricoes_consulta (id, consulta_id, medicamento_id, quantidade, posologia, ativo, criado_em, atualizado_em)
+             VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+          ).run(prescId, id, presc.medicamentoId, presc.quantidade, presc.posologia ?? null, agora, agora);
+
+          // Gravar na sync_outbox para prescrição
+          const dadosSyncPresc: DadosSyncPrescricao = {
+            id: prescId,
+            consulta_id: id,
+            medicamento_id: presc.medicamentoId,
+            quantidade: presc.quantidade,
+            posologia: presc.posologia ?? null,
+            criado_em: agora,
+          };
+          db.prepare(
+            `INSERT INTO sync_outbox (tabela, registro_id, operacao, dados, criado_em)
+             VALUES (?, ?, 'inserir', ?, ?)`,
+          ).run('prescricoes_consulta', prescId, JSON.stringify(dadosSyncPresc), agora);
 
           // Baixar estoque dos lotes (FEFO)
           let qtdRestante = presc.quantidade;
@@ -471,43 +467,28 @@ export class ConsultasRepository implements RepositorioConsultas {
             const movId = randomUUID();
 
             db.prepare(
-              `INSERT INTO estoque_movimentacoes (id, medicamento_id, tipo, quantidade, lote_id, motivo, referencia_id, referencia_tipo, usuario_id, criado_em)
-               VALUES (?, ?, 'SAIDA', ?, ?, 'Prescrição em consulta', ?, 'consulta', ?, ?)`,
-            ).run(movId, presc.medicamentoId, -qtdBaixa, lote.id, id, usuarioId, agora);
-
-            // Atualizar saldo do lote (implícito via movimentações)
-
-            // Gravar na sync_outbox para prescrição
-            const dadosSyncPresc: DadosSyncPrescricao = {
-              id: prescId,
-              consulta_id: id,
-              medicamento_id: presc.medicamentoId,
-              quantidade: presc.quantidade,
-              posologia: presc.posologia ?? null,
-              criado_em: agora,
-            };
-            db.prepare(
-              `INSERT INTO sync_outbox (tabela, registro_id, operacao, dados, criado_em)
-               VALUES (?, ?, 'inserir', ?, ?)`,
-            ).run('prescricoes', prescId, JSON.stringify(dadosSyncPresc), agora);
+              `INSERT INTO movimentacoes_estoque (id, medicamento_id, lote_id, consulta_id, usuario_id, tipo, quantidade, motivo, ativo, criado_em, atualizado_em)
+               VALUES (?, ?, ?, ?, ?, 'SAIDA', ?, 'Prescrição em consulta', 1, ?, ?)`,
+            ).run(movId, presc.medicamentoId, lote.id, id, usuarioMovId, -qtdBaixa, agora, agora);
 
             // Gravar na sync_outbox para movimentação
             const dadosSyncMov = {
               id: movId,
               medicamento_id: presc.medicamentoId,
+              lote_id: lote.id,
+              consulta_id: id,
+              usuario_id: usuarioMovId,
               tipo: 'SAIDA',
               quantidade: -qtdBaixa,
-              lote_id: lote.id,
               motivo: 'Prescrição em consulta',
-              referencia_id: id,
-              referencia_tipo: 'consulta',
-              usuario_id: usuarioId,
+              ativo: 1,
               criado_em: agora,
+              atualizado_em: agora,
             };
             db.prepare(
               `INSERT INTO sync_outbox (tabela, registro_id, operacao, dados, criado_em)
                VALUES (?, ?, 'inserir', ?, ?)`,
-            ).run('estoque_movimentacoes', movId, JSON.stringify(dadosSyncMov), agora);
+            ).run('movimentacoes_estoque', movId, JSON.stringify(dadosSyncMov), agora);
 
             qtdRestante -= qtdBaixa;
             if (qtdRestante === 0) break;

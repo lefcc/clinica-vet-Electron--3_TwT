@@ -61,9 +61,9 @@ export function registrarTrilha2Ipc(): void {
 
   registrarHandler<{ inicio: string; fim: string; veterinario_id?: string }, AgendamentoComRelacoes[]>('agendamentos:listar', PERFIS.TODOS, async (_evt, dados) => criarAgendaService().listar(dados));
   registrarHandler<{ id: string }, AgendamentoComRelacoes>('agendamentos:obter', PERFIS.TODOS, async (_evt, dados) => criarAgendaService().obter(dados.id));
-  registrarHandler<unknown, AgendamentoComRelacoes>('agendamentos:criar', PERFIS.MASTER_VET, async (_evt, dados) => criarAgendaService().criar(dados));
-  registrarHandler<unknown, AgendamentoComRelacoes>('agendamentos:atualizar', PERFIS.MASTER_VET, async (_evt, dados) => criarAgendaService().atualizar(dados));
-  registrarHandler<{ id: string }, void>('agendamentos:cancelar', PERFIS.MASTER_VET, async (_evt, dados) => criarAgendaService().cancelar(dados));
+  registrarHandler<unknown, AgendamentoComRelacoes>('agendamentos:criar', PERFIS.MASTER_ATENDENTE, async (_evt, dados) => criarAgendaService().criar(dados));
+  registrarHandler<unknown, AgendamentoComRelacoes>('agendamentos:atualizar', PERFIS.MASTER_ATENDENTE, async (_evt, dados) => criarAgendaService().atualizar(dados));
+  registrarHandler<{ id: string }, void>('agendamentos:cancelar', PERFIS.MASTER_ATENDENTE, async (_evt, dados) => criarAgendaService().cancelar(dados));
   registrarHandler<Record<string, never>, { id: string; nome: string; crmv: string | null }[]>('agendamentos:veterinarios', PERFIS.TODOS, async (_evt, dados) => criarAgendaService().listarVeterinarios(dados));
 
   // ============================================================================

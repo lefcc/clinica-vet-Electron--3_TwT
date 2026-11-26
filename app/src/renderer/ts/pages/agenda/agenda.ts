@@ -44,8 +44,30 @@ function abrirFormulario(item: Agendamento | undefined, diaInicial: string, aoSa
     { nome: 'cliente_id', rotulo: 'Cliente (tutor)', tipo: 'select', obrigatorio: true },
     { nome: 'animal_id', rotulo: 'Animal', tipo: 'select', obrigatorio: true },
     { nome: 'veterinario_id', rotulo: 'Veterinário(a)', tipo: 'select', obrigatorio: true, largura: 'inteira' },
-    { nome: 'data', rotulo: 'Data', tipo: 'data', obrigatorio: true, largura: 'terco', valorInicial: diaInicial },
-    { nome: 'hora', rotulo: 'Horário', tipo: 'hora', obrigatorio: true, largura: 'terco' },
+    {
+      nome: 'data',
+      rotulo: 'Data',
+      tipo: 'data',
+      obrigatorio: true,
+      largura: 'terco',
+      valorInicial: diaInicial,
+      validar: (v) => (v && v < hojeISO() ? 'Não é possível agendar em uma data passada.' : undefined),
+    },
+    {
+      nome: 'hora',
+      rotulo: 'Horário',
+      tipo: 'hora',
+      obrigatorio: true,
+      largura: 'terco',
+      validar: (v, todos) => {
+        if (!v || !todos['data']) return undefined;
+        const inicioUtc = saoPauloParaUtc(todos['data'], v);
+        if (new Date(inicioUtc).getTime() < Date.now() - 60_000) {
+          return 'Não é possível agendar em um horário que já passou.';
+        }
+        return undefined;
+      },
+    },
     {
       nome: 'duracao_min',
       rotulo: 'Duração',

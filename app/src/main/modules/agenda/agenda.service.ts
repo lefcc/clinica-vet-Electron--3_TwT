@@ -2,11 +2,16 @@ import { z, ZodError } from 'zod';
 import { ErroNegocio } from '../../erros/erro-negocio';
 import type {
   RepositorioAgendamentos,
-  EntradaListagem,
   AgendamentoComRelacoes,
   NovoAgendamento,
 } from './agenda.repository';
-import { AgendamentoEntradaSchema, AgendamentoAtualizarSchema, AgendamentoVeterinariosSchema, AgendamentoCancelarSchema, AgendamentoIdSchema } from '@clinica-vet/shared/agendamentos';
+import {
+  AgendamentoEntradaSchema,
+  AgendamentoAtualizarEntradaSchema as AgendamentoAtualizarSchema,
+  AgendamentoVeterinariosSchema,
+  AgendamentoCancelarSchema,
+  AgendamentoIdSchema,
+} from '@clinica-vet/shared';
 
 // ============================================================================
 // SERVICE
@@ -15,14 +20,19 @@ import { AgendamentoEntradaSchema, AgendamentoAtualizarSchema, AgendamentoVeteri
 export class AgendaService {
   constructor(
     private readonly repo: RepositorioAgendamentos,
-    private readonly sessao: { usuarioId: string; colaboradorId: string; perfil: 'MASTER' | 'VETERINARIO' | 'ATENDENTE' } | null,
+    private readonly sessao: { usuarioId: string; colaboradorId?: string; perfil: 'MASTER' | 'VETERINARIO' | 'ATENDENTE' } | null,
+    private readonly agoraSegundos: () => number = () => Math.floor(Date.now() / 1000),
   ) {}
+
+  private obterVetDaSessao(): string | undefined {
+    return this.sessao?.colaboradorId ?? this.sessao?.usuarioId;
+  }
 
   listar(entrada: unknown): AgendamentoComRelacoes[] {
     const dados = this.validarSchema(this.validarListagem, entrada);
 
     // Se for VETERINARIO, filtrar apenas seus agendamentos
-    const veterinarioId = this.sessao?.perfil === 'VETERINARIO' ? this.sessao.colaboradorId : dados.veterinario_id;
+    const veterinarioId = this.sessao?.perfil === 'VETERINARIO' ? this.obterVetDaSessao() : dados.veterinario_id;
 
     // dados.inicio e dados.fim já são Unix seconds (transform do schema)
     return this.repo.listar({
@@ -46,6 +56,10 @@ export class AgendaService {
     const inicioTimestamp = Math.floor(new Date(dados.inicio).getTime() / 1000);
     const fimTimestamp = inicioTimestamp + dados.duracao_min * 60;
 
+    if (inicioTimestamp < this.agoraSegundos() - 60) {
+      throw new ErroNegocio('AGENDA_CONFLITO', 'Não é possível agendar para uma data ou horário que já passou.');
+    }
+
     // Verificar se animal existe e está ativo
     if (!this.repo.verificarAnimalExiste(dados.animal_id)) {
       throw new ErroNegocio('NAO_ENCONTRADO', 'Animal não encontrado ou inativo.');
@@ -62,7 +76,7 @@ export class AgendaService {
     }
 
     // Se for VETERINARIO, só pode criar para si mesmo
-    if (this.sessao?.perfil === 'VETERINARIO' && dados.veterinario_id !== this.sessao.colaboradorId) {
+    if (this.sessao?.perfil === 'VETERINARIO' && dados.veterinario_id !== this.obterVetDaSessao()) {
       throw new ErroNegocio('SEM_PERMISSAO', 'Veterinários só podem agendar para si mesmos.');
     }
 
@@ -88,7 +102,7 @@ export class AgendaService {
     if (!existente) throw new ErroNegocio('NAO_ENCONTRADO', 'Agendamento não encontrado.');
 
     // Se for VETERINARIO, só pode atualizar seus próprios agendamentos
-    if (this.sessao?.perfil === 'VETERINARIO' && existente.veterinario_id !== this.sessao.colaboradorId) {
+    if (this.sessao?.perfil === 'VETERINARIO' && existente.veterinario_id !== this.obterVetDaSessao()) {
       throw new ErroNegocio('SEM_PERMISSAO', 'Veterinários só podem editar seus próprios agendamentos.');
     }
 
@@ -96,9 +110,18 @@ export class AgendaService {
     if (dados.veterinario_id || dados.inicio || dados.duracao_min) {
       const veterinarioId = dados.veterinario_id || existente.veterinario_id;
       // dados.inicio já é Unix seconds se vier do schema transform, senão converte
-      const inicio = dados.inicio ? (typeof dados.inicio === 'string' ? Math.floor(new Date(dados.inicio).getTime() / 1000) : dados.inicio) : existente.inicio;
+      const existenteInicioSeg = typeof existente.inicio === 'string'
+        ? Math.floor(new Date(existente.inicio).getTime() / 1000)
+        : existente.inicio;
+      const inicio = dados.inicio
+        ? (typeof dados.inicio === 'string' ? Math.floor(new Date(dados.inicio).getTime() / 1000) : dados.inicio)
+        : existenteInicioSeg;
       const duracaoMin = dados.duracao_min || existente.duracao_min;
       const fim = inicio + duracaoMin * 60;
+
+      if (dados.inicio && inicio < this.agoraSegundos() - 60) {
+        throw new ErroNegocio('AGENDA_CONFLITO', 'Não é possível reagendar para uma data ou horário que já passou.');
+      }
 
       if (this.repo.verificarConflito(veterinarioId, inicio, fim, id)) {
         throw new ErroNegocio('AGENDA_CONFLITO', 'Já existe um agendamento para este veterinário neste horário.');
@@ -106,7 +129,7 @@ export class AgendaService {
     }
 
     // Se for VETERINARIO, não pode mudar o veterinário_id
-    if (this.sessao?.perfil === 'VETERINARIO' && dados.veterinario_id && dados.veterinario_id !== this.sessao.colaboradorId) {
+    if (this.sessao?.perfil === 'VETERINARIO' && dados.veterinario_id && dados.veterinario_id !== this.obterVetDaSessao()) {
       throw new ErroNegocio('SEM_PERMISSAO', 'Veterinários não podem transferir agendamentos para outro veterinário.');
     }
 
@@ -128,7 +151,7 @@ export class AgendaService {
     if (!existente) throw new ErroNegocio('NAO_ENCONTRADO', 'Agendamento não encontrado.');
 
     // Se for VETERINARIO, só pode cancelar seus próprios agendamentos
-    if (this.sessao?.perfil === 'VETERINARIO' && existente.veterinario_id !== this.sessao.colaboradorId) {
+    if (this.sessao?.perfil === 'VETERINARIO' && existente.veterinario_id !== this.obterVetDaSessao()) {
       throw new ErroNegocio('SEM_PERMISSAO', 'Veterinários só podem cancelar seus próprios agendamentos.');
     }
 

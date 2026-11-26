@@ -1,4 +1,4 @@
-import { LoginEntradaSchema, type Sessao as SessaoDto } from '@clinica-vet/shared';
+import { LoginEntradaSchema, SessaoSchema, type Sessao as SessaoDto } from '@clinica-vet/shared';
 import { ErroNegocio } from '../../erros/erro-negocio';
 import type { HashSenha } from './hash-senha';
 import type { ArmazemSessao } from './sessao-em-memoria';
@@ -7,18 +7,8 @@ import type { RepositorioUsuarios } from './usuario.repository';
 export { LoginEntradaSchema };
 export type { SessaoDto };
 
-<<<<<<< Updated upstream
 interface AuditoriaAuth {
   executar(acao: 'LOGIN' | 'LOGOUT', sessao: SessaoDto, efetivar: () => void): void;
-=======
-// o que volta pro front (nunca tem senha_hash)
-export interface SessaoDto {
-  usuarioId: string;
-  colaboradorId: string;
-  nome: string;
-  perfil: Perfil;
-  expiraEm: number;
->>>>>>> Stashed changes
 }
 
 export class AuthService {
@@ -49,19 +39,21 @@ export class AuthService {
     // mesma mensagem pros dois casos: não conta se errou o usuário ou a senha
     if (!usuario || !senhaConfere) throw new ErroNegocio('CREDENCIAIS_INVALIDAS', 'Usuário ou senha inválidos.');
 
-<<<<<<< Updated upstream
     // A senha e o perfil podem ter mudado durante o bcrypt assíncrono.
     const atual = this.usuarios.buscarAtivoPorLogin(dados.data.login);
     if (!atual || atual.id !== usuario.id || atual.senhaHash !== usuario.senhaHash) {
       throw new ErroNegocio('CREDENCIAIS_INVALIDAS', 'Usuário ou senha inválidos.');
     }
-    const sessao: SessaoDto = { usuarioId: atual.id, nome: atual.nome, perfil: atual.perfil, expiraEm: Date.now() + this.duracaoSessaoMs };
+    const sessao = SessaoSchema.parse({
+      usuarioId: atual.id,
+      ...(atual.colaboradorId ? { colaboradorId: atual.colaboradorId } : {}),
+      nome: atual.nome,
+      perfil: atual.perfil,
+      expiraEm: Date.now() + this.duracaoSessaoMs,
+    });
     const registrarLogin = () => this.usuarios.registrarLogin(atual.id);
     if (this.auditoria) this.auditoria.executar('LOGIN', sessao, registrarLogin);
     else registrarLogin();
-=======
-    const sessao: SessaoDto = { usuarioId: usuario.id, colaboradorId: usuario.colaboradorId, nome: usuario.nome, perfil: usuario.perfil, expiraEm: Date.now() + this.duracaoSessaoMs };
->>>>>>> Stashed changes
     this.sessoes.definir(sessao);
     return sessao;
   }
@@ -74,7 +66,13 @@ export class AuthService {
       this.sessoes.definir(null);
       throw new ErroNegocio('SESSAO_EXPIRADA', 'Sua sessão expirou. Entre novamente.');
     }
-    return { usuarioId: sessao.usuarioId, colaboradorId: sessao.colaboradorId, nome: sessao.nome ?? '', perfil: sessao.perfil, expiraEm: sessao.expiraEm };
+    return SessaoSchema.parse({
+      usuarioId: sessao.usuarioId,
+      ...(sessao.colaboradorId ? { colaboradorId: sessao.colaboradorId } : {}),
+      nome: sessao.nome,
+      perfil: sessao.perfil,
+      expiraEm: sessao.expiraEm,
+    });
   }
 
   sair(): void {

@@ -7,18 +7,14 @@ import { EsquemaLocal } from './db/local/esquema-local';
 import { obterConexaoLocal } from './db/local/client';
 import { SeedUsuarioExemplo } from './db/local/seed-usuario-exemplo';
 import { AuthIpc } from './ipc/auth.ipc';
-<<<<<<< Updated upstream
 import { permitirOrigemIpc, sessoes } from './ipc/registry';
 import { criarTrilha1, registrarTrilha1 } from './ipc/trilha1.ipc';
+import { registrarTrilha2Ipc } from './ipc/trilha2.ipc';
 import { registrarTrilha3Ipc } from './ipc/trilha3.ipc';
 import { registrarTrilha4Ipc } from './ipc/trilha4.ipc';
 import { registrarEstadoSync } from './ipc/sync.ipc';
 import { OutboxRepository } from './modules/admin/outbox.repository';
 import { runInTransaction } from './modules/admin/transacao';
-=======
-import { registrarTrilha2Ipc } from './ipc/trilha2.ipc';
-import { sessoes } from './ipc/registry';
->>>>>>> Stashed changes
 import { AuthService } from './modules/auth/auth.service';
 import { HashSenha } from './modules/auth/hash-senha';
 import { UsuarioRepository } from './modules/auth/usuario.repository';
@@ -36,7 +32,8 @@ class Aplicacao {
     if (process.argv.includes('--configurar-mysql')) {
       try {
         provisionarMysql();
-        app.exit(0);
+        // O Chromium persiste a chave do safeStorage ao encerrar normalmente.
+        app.quit();
       } catch {
         dialog.showErrorBox('Configuração MySQL', 'Confira os campos da conexão e a disponibilidade do cofre de credenciais.');
         app.exit(1);
@@ -75,7 +72,8 @@ class Aplicacao {
       new EsquemaLocal(conexao).aplicar();
 
       const hash = new HashSenha(Math.max(10, config.bcryptCost));
-      const usuarios = new UsuarioRepository(conexao, config.sync.habilitado);
+      // A primeira conta de uma instalação também precisa sobreviver à configuração posterior do MySQL.
+      const usuarios = new UsuarioRepository(conexao, app.isPackaged || config.sync.habilitado);
 
       const dados = SeedUsuarioExemplo.escolherDados(config.usuarioExemplo, !app.isPackaged && !config.sync.habilitado);
       const resultado = await new SeedUsuarioExemplo(usuarios, hash).executar(dados);
@@ -96,8 +94,8 @@ class Aplicacao {
         })
       });
       new AuthIpc(auth).registrar();
-<<<<<<< Updated upstream
       registrarTrilha1(trilha1, () => getSyncStatus().emAndamento);
+      registrarTrilha2Ipc();
       registrarTrilha3Ipc(conexao, config.dolar.apiUrl);
       registrarTrilha4Ipc(conexao, { configuracoes: () => trilha1.configuracoes.obter() });
       registrarEstadoSync(new OutboxRepository(conexao), getSyncStatus);
@@ -128,11 +126,6 @@ class Aplicacao {
         });
       }
       return true;
-=======
-
-      // Registrar handlers da Trilha 2 (Clientes, Animais, Agenda, Consultas)
-      registrarTrilha2Ipc();
->>>>>>> Stashed changes
     } catch (erro) {
       const detalhe = erro instanceof Error ? erro.message : String(erro);
       console.error('Erro ao preparar o banco local:', detalhe);

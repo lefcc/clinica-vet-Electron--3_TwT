@@ -14,13 +14,19 @@ class RepositorioFalso implements RepositorioAgendamentos {
   veterinarios: { id: string; nome: string; crmv: string | null; ativo: boolean; perfil: string }[] = [];
 
   listar(entrada: { inicio: number; fim: number; veterinario_id?: string }): AgendamentoComRelacoes[] {
-    let lista = this.agendamentos.filter(
-      (a) => a.ativo && a.inicio >= entrada.inicio && a.inicio < entrada.fim,
-    );
+    const lista = this.agendamentos.filter((a) => {
+      const ini = typeof a.inicio === 'string' ? Math.floor(new Date(a.inicio).getTime() / 1000) : a.inicio;
+      return a.ativo && ini >= entrada.inicio && ini < entrada.fim;
+    });
+    let filtrada = lista;
     if (entrada.veterinario_id) {
-      lista = lista.filter((a) => a.veterinario_id === entrada.veterinario_id);
+      filtrada = filtrada.filter((a) => a.veterinario_id === entrada.veterinario_id);
     }
-    return lista.sort((a, b) => a.inicio - b.inicio);
+    return filtrada.sort((a, b) => {
+      const ia = typeof a.inicio === 'string' ? Math.floor(new Date(a.inicio).getTime() / 1000) : a.inicio;
+      const ib = typeof b.inicio === 'string' ? Math.floor(new Date(b.inicio).getTime() / 1000) : b.inicio;
+      return ia - ib;
+    });
   }
 
   obter(id: string): AgendamentoComRelacoes | undefined {
@@ -42,15 +48,17 @@ class RepositorioFalso implements RepositorioAgendamentos {
   }
 
   verificarConflito(veterinarioId: string, inicio: number, fim: number, ignorarId?: string): boolean {
-    return this.agendamentos.some(
-      (a) =>
+    return this.agendamentos.some((a) => {
+      const ini = typeof a.inicio === 'string' ? Math.floor(new Date(a.inicio).getTime() / 1000) : a.inicio;
+      return (
         a.veterinario_id === veterinarioId &&
         a.ativo &&
         a.status !== 'CANCELADO' &&
         a.id !== ignorarId &&
-        a.inicio < fim &&
-        a.inicio + a.duracao_min * 60 > inicio,
-    );
+        ini < fim &&
+        ini + a.duracao_min * 60 > inicio
+      );
+    });
   }
 
   criar(dados: Omit<AgendamentoComRelacoes, 'id' | 'ativo' | 'criadoEm' | 'atualizadoEm'>): AgendamentoComRelacoes {
@@ -145,10 +153,11 @@ describe('AgendaService', () => {
 
   const inicio = Math.floor(new Date('2026-11-25T10:00:00Z').getTime() / 1000);
   const fim = inicio + 30 * 60;
+  const relogioFixo = () => inicio - 3600;
 
   beforeEach(() => {
     repo = new RepositorioFalso();
-    service = new AgendaService(repo, sessaoMaster);
+    service = new AgendaService(repo, sessaoMaster, relogioFixo);
 
     repo.adicionarVeterinario({ id: veterinarioId, nome: 'Dr. João', crmv: '12345', ativo: true, perfil: 'VETERINARIO' });
     repo.adicionarVeterinario({ id: outroVeterinarioId, nome: 'Dra. Maria', crmv: '54321', ativo: true, perfil: 'VETERINARIO' });
@@ -181,7 +190,7 @@ describe('AgendaService', () => {
     });
 
     it('como VETERINARIO filtra apenas próprios agendamentos', () => {
-      const serviceVet = new AgendaService(repo, sessaoVet);
+      const serviceVet = new AgendaService(repo, sessaoVet, relogioFixo);
       service.criar({ animal_id: animalId, veterinario_id: veterinarioId, inicio: new Date(inicio * 1000).toISOString(), duracao_min: 30 });
       service.criar({ animal_id: animalId, veterinario_id: outroVeterinarioId, inicio: new Date(inicio * 1000).toISOString(), duracao_min: 30 });
 
@@ -280,7 +289,7 @@ describe('AgendaService', () => {
     });
 
     it('VETERINARIO só pode criar para si mesmo', () => {
-      const serviceVet = new AgendaService(repo, sessaoVet);
+      const serviceVet = new AgendaService(repo, sessaoVet, relogioFixo);
       try {
         serviceVet.criar({
           animal_id: animalId,
@@ -316,7 +325,7 @@ describe('AgendaService', () => {
     });
 
     it('VETERINARIO só pode atualizar seus próprios agendamentos', () => {
-      const serviceVet = new AgendaService(repo, sessaoVet);
+      const serviceVet = new AgendaService(repo, sessaoVet, relogioFixo);
       const ag = service.criar({ animal_id: animalId, veterinario_id: outroVeterinarioId, inicio: new Date(inicio * 1000).toISOString(), duracao_min: 30 });
       try {
         serviceVet.atualizar({ id: ag.id, motivo: 'Tentativa' });
@@ -327,7 +336,7 @@ describe('AgendaService', () => {
     });
 
     it('VETERINARIO não pode transferir agendamento para outro veterinário', () => {
-      const serviceVet = new AgendaService(repo, sessaoVet);
+      const serviceVet = new AgendaService(repo, sessaoVet, relogioFixo);
       const ag = service.criar({ animal_id: animalId, veterinario_id: veterinarioId, inicio: new Date(inicio * 1000).toISOString(), duracao_min: 30 });
       try {
         serviceVet.atualizar({ id: ag.id, veterinario_id: outroVeterinarioId });
@@ -349,7 +358,7 @@ describe('AgendaService', () => {
     });
 
     it('VETERINARIO só pode cancelar seus próprios agendamentos', () => {
-      const serviceVet = new AgendaService(repo, sessaoVet);
+      const serviceVet = new AgendaService(repo, sessaoVet, relogioFixo);
       const ag = service.criar({ animal_id: animalId, veterinario_id: outroVeterinarioId, inicio: new Date(inicio * 1000).toISOString(), duracao_min: 30 });
       try {
         serviceVet.cancelar({ id: ag.id });

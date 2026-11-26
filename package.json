@@ -18,11 +18,7 @@
   },
   "devDependencies": {
     "marked": "^18.2.1",
-<<<<<<< Updated upstream
     "prettier": "3.9.10",
-=======
-    "pdf-parse": "^2.4.5",
->>>>>>> Stashed changes
     "puppeteer": "^25.18.1",
     "typescript": "^5.5.0"
   },

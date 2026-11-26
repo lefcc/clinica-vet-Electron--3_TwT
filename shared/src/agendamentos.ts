@@ -10,7 +10,7 @@ export const AgendamentoEntradaSchema = z.object({
   cliente_id: z.string().uuid().optional().or(z.literal('')),
 });
 
-export const AgendamentoAtualizarSchema = AgendamentoEntradaSchema.partial();
+export const AgendamentoAtualizarEntradaSchema = AgendamentoEntradaSchema.partial();
 
 export const AgendamentoIdSchema = z.object({
   id: z.string().uuid(),
@@ -26,7 +26,7 @@ export const AgendamentoCancelarSchema = z.object({
   id: z.string().uuid(),
 });
 
-export const AgendamentoVeterinariosSchema = z.object({});
+export const AgendamentoVeterinariosSchema = z.object({}).optional();
 
 // Canais IPC
 export const CANAIS_AGENDAMENTOS = {
@@ -40,7 +40,7 @@ export const CANAIS_AGENDAMENTOS = {
 
 // Tipos derivados
 export type AgendamentoEntrada = z.infer<typeof AgendamentoEntradaSchema>;
-export type AgendamentoAtualizar = z.infer<typeof AgendamentoAtualizarSchema>;
+export type AgendamentoAtualizar = z.infer<typeof AgendamentoAtualizarEntradaSchema>;
 export type AgendamentoId = z.infer<typeof AgendamentoIdSchema>;
 export type AgendamentoListar = z.infer<typeof AgendamentoListarSchema>;
 export type AgendamentoCancelar = z.infer<typeof AgendamentoCancelarSchema>;

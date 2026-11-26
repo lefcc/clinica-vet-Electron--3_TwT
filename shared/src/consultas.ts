@@ -1,7 +1,7 @@
 // Schemas Zod e canais IPC para consultas
 import { z } from 'zod';
 
-export const PrescricaoSchema = z.object({
+export const PrescricaoConsultaEntradaSchema = z.object({
   medicamento_id: z.string().uuid('Medicamento inválido'),
   quantidade: z.coerce.number().int().positive('Quantidade deve ser positiva'),
   posologia: z.string().max(500).optional().or(z.literal('')),
@@ -12,7 +12,7 @@ export const ConsultaEntradaSchema = z.object({
   anamnese: z.string().trim().min(1, 'Anamnese é obrigatória').max(5000),
   diagnostico: z.string().max(5000).optional().or(z.literal('')),
   observacoes: z.string().max(5000).optional().or(z.literal('')),
-  prescricoes: z.array(PrescricaoSchema).default([]),
+  prescricoes: z.array(PrescricaoConsultaEntradaSchema).default([]),
   agendamento_id: z.string().uuid().optional().or(z.literal('')),
 });
 
@@ -43,7 +43,7 @@ export const CANAIS_CONSULTAS = {
 } as const;
 
 // Tipos derivados
-export type Prescricao = z.infer<typeof PrescricaoSchema>;
+export type PrescricaoConsultaEntrada = z.infer<typeof PrescricaoConsultaEntradaSchema>;
 export type ConsultaEntrada = z.infer<typeof ConsultaEntradaSchema>;
 export type ConsultaId = z.infer<typeof ConsultaIdSchema>;
 export type ConsultaListar = z.infer<typeof ConsultaListarSchema>;

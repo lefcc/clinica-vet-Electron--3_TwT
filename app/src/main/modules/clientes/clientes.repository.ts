@@ -135,10 +135,6 @@ function mapearCliente(linha: LinhaCliente): Cliente {
   };
 }
 
-function normalizarBusca(texto: string): string {
-  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-}
-
 export class ClienteRepository implements RepositorioClientes {
   constructor(private readonly banco: BancoSql) {}
 

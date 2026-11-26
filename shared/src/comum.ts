@@ -25,7 +25,7 @@ export function paginaSchema<T extends z.ZodTypeAny>(item: T) {
   return z.object({ ...paginacao, itens: z.array(item), total: z.number().int().nonnegative() }).strict();
 }
 
-export const SessaoSchema = z.object({ usuarioId: IdSchema, nome: NomeSchema, perfil: PerfilSchema, expiraEm: z.number().int().positive() }).strict();
+export const SessaoSchema = z.object({ usuarioId: IdSchema, colaboradorId: IdSchema.optional(), nome: NomeSchema, perfil: PerfilSchema, expiraEm: z.number().int().positive() }).strict();
 export type Sessao = z.infer<typeof SessaoSchema>;
 export const LoginEntradaSchema = z.object({ login: z.string().trim().min(1).max(60), senha: z.string().min(1).max(200) }).strict();
 export const EstadoSyncSchema = z.object({ estado: z.enum(['local', 'sincronizado', 'sincronizando', 'erro']), pendentes: z.number().int().nonnegative(), ultimo_sync_em: DataUtcSchema.optional() }).strict();
