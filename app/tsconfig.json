@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "lib": ["ES2022", "DOM"],
     "strict": true,
     "skipLibCheck": true,
@@ -20,7 +20,7 @@
     "types": ["node", "electron"],
     "baseUrl": ".",
     "paths": {
-      "@clinica-vet/shared/*": ["../shared/src/*"],
+      "@clinica-vet/shared/*": ["../shared/dist/*"],
       "@clinica-vet/app/*": ["src/*"]
     }
   },

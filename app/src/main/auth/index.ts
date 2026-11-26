@@ -43,6 +43,7 @@ export async function autenticar(credenciais: CredenciaisLogin): Promise<Usuario
 
   const sessao: Sessao = {
     usuarioId: usuario.id,
+    colaboradorId: usuario.colaborador_id,
     perfil: usuario.perfil,
     expiraEm: Date.now() + SESSION_TTL_MS
   };

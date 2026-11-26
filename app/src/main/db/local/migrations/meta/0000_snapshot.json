@@ -1,6 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
+<<<<<<< Updated upstream
   "id": "6901f514-7f29-45f3-b4a7-fb6cf512b4e6",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
@@ -244,6 +245,11 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+=======
+  "id": "ff0e20c3-9b2d-4f41-918b-46996c652c81",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+>>>>>>> Stashed changes
     "animais": {
       "name": "animais",
       "columns": {
@@ -369,6 +375,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+<<<<<<< Updated upstream
     "auditoria": {
       "name": "auditoria",
       "columns": {
@@ -495,6 +502,8 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+=======
+>>>>>>> Stashed changes
     "clientes": {
       "name": "clientes",
       "columns": {
@@ -738,6 +747,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+<<<<<<< Updated upstream
     "configuracoes": {
       "name": "configuracoes",
       "columns": {
@@ -1049,6 +1059,8 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+=======
+>>>>>>> Stashed changes
     "fornecedores": {
       "name": "fornecedores",
       "columns": {
@@ -1132,6 +1144,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+<<<<<<< Updated upstream
     "fornecedores_precos": {
       "name": "fornecedores_precos",
       "columns": {
@@ -1426,6 +1439,8 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+=======
+>>>>>>> Stashed changes
     "medicamentos": {
       "name": "medicamentos",
       "columns": {
@@ -1517,6 +1532,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+<<<<<<< Updated upstream
     "movimentacoes_estoque": {
       "name": "movimentacoes_estoque",
       "columns": {
@@ -2069,6 +2085,8 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+=======
+>>>>>>> Stashed changes
     "sync_conflitos": {
       "name": "sync_conflitos",
       "columns": {
@@ -2396,6 +2414,7 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
+<<<<<<< Updated upstream
     },
     "vacinas_aplicacoes": {
       "name": "vacinas_aplicacoes",
@@ -2602,6 +2621,8 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
+=======
+>>>>>>> Stashed changes
     }
   },
   "enums": {},

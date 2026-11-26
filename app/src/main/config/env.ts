@@ -2,7 +2,6 @@
 import * as path from 'path';
 import { mkdirSync } from 'node:fs';
 import * as dotenv from 'dotenv';
-import { app } from 'electron';
 
 const perfilLocal = app.commandLine?.getSwitchValue('user-data-dir');
 if (perfilLocal) {
@@ -17,6 +16,29 @@ if (!app.isPackaged && process.env.NODE_ENV !== 'production') {
   for (const pasta of [process.cwd(), path.resolve(process.cwd(), '..')]) {
     dotenv.config({ path: path.join(pasta, '.env') });
   }
+}
+
+// app do Electron é carregado lazy para evitar erro quando roda fora do Electron (ex: testes, build)
+let _electronApp: Electron.App | null = null;
+function getElectronApp(): Electron.App | null {
+  if (!_electronApp) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      _electronApp = require('electron').app;
+    } catch {
+      _electronApp = null;
+    }
+  }
+  return _electronApp;
+}
+
+function getUserDataPath(): string {
+  const electronApp = getElectronApp();
+  if (electronApp) {
+    return electronApp.getPath('userData');
+  }
+  // Fallback para testes/build fora do Electron: usa pasta temporária ou cwd
+  return process.env.APPDATA || process.env.HOME || process.cwd();
 }
 
 interface Config {
@@ -90,7 +112,7 @@ function getEnvBoolean(key: string, defaultValue?: boolean): boolean {
 }
 
 export const config: Config = {
-  sqlitePath: path.join(app.getPath('userData'), 'clinica-vet.sqlite'),
+  sqlitePath: path.join(getUserDataPath(), 'clinica-vet.sqlite'),
 
   mysql: {
     host: getEnv('MYSQL_HOST', 'localhost'),

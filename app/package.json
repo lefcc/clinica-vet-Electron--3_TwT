@@ -15,11 +15,18 @@
     "test": "pnpm --filter @clinica-vet/shared build && node scripts/test.js",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+<<<<<<< Updated upstream
     "db:migrate": "node scripts/sqlite-kit.js migrate",
     "db:push": "node scripts/sqlite-kit.js push",
     "db:studio": "node scripts/sqlite-kit.js studio",
     "rebuild:sqlite": "node scripts/rebuild-sqlite.js",
     "postinstall": "pnpm rebuild:sqlite"
+=======
+    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+    "db:push": "drizzle-kit push --config=drizzle.config.ts",
+    "db:studio": "drizzle-kit studio --config=drizzle.config.ts",
+    "postinstall": "electron-rebuild -f -w better-sqlite3 && node scripts/patch-electron.js"
+>>>>>>> Stashed changes
   },
   "dependencies": {
     "@clinica-vet/shared": "workspace:*",
@@ -27,6 +34,10 @@
     "better-sqlite3": "^11.0.0",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.33.0",
+<<<<<<< Updated upstream
+=======
+    "electron-rebuild": "^3.2.9",
+>>>>>>> Stashed changes
     "mysql2": "^3.11.0",
     "node-cron": "^3.0.3",
     "zod": "^3.23.0"

@@ -1,5 +1,6 @@
 // Exportações centralizadas do pacote shared
 export * from './perfil';
+<<<<<<< Updated upstream
 export * from './comum';
 export * from './clientes-animais';
 export * from './estoque-fornecedores';
@@ -18,3 +19,8 @@ export const ResumoInicioSchema = z.object({
   pendencias_sync: z.number().int().nonnegative()
 });
 export type ResumoInicio = z.infer<typeof ResumoInicioSchema>;
+=======
+export * from './agendamentos';
+export * from './consultas';
+// Schemas Zod, tipos e canais IPC serão adicionados conforme desenvolvimento
+>>>>>>> Stashed changes
