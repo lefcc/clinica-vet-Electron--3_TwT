@@ -18,7 +18,42 @@ export function criarMockTrilha4(): Record<string, HandlerMockTrilha4> {
   }];
   const orcamentos: Orcamento[] = [];
 
+  // esta função cria as respostas de listar, obter, criar, atualizar e inativar
+  function cadastro<T extends { id: string; ativo: boolean }>(lista: T[], prefixo: string): Record<string, HandlerMockTrilha4> {
+    const achar = (dados: unknown) => lista.find((i) => i.id === (dados as { id: string }).id && i.ativo);
+    const naoAchou = () => erro('NAO_ENCONTRADO', 'Registro não encontrado.');
+    return {
+      [`${prefixo}listar`]: () => pagina(lista.filter((i) => i.ativo)),
+      [`${prefixo}obter`]: (dados) => { const item = achar(dados); return item ? ok(item) : naoAchou(); },
+      [`${prefixo}criar`]: (dados) => {
+        const item = { ...(dados as T), id: `${prefixo}${lista.length + 1}`, ativo: true };
+        lista.push(item);
+        return ok(item);
+      },
+      [`${prefixo}atualizar`]: (dados) => { const item = achar(dados); return item ? ok(Object.assign(item, dados)) : naoAchou(); },
+      [`${prefixo}inativar`]: (dados) => {
+        const item = achar(dados);
+        if (!item) return naoAchou();
+        item.ativo = false;
+        return ok({});
+      }
+    };
+  }
+
   return {
+    ...cadastro(vacinas, 'vacinas:catalogo_'),
+    ...cadastro(servicos, 'servicos:'),
+    'vacinas:aplicar': (dados) => {
+      const { vacina_id, data } = dados as { vacina_id: string; data: string };
+      const vacina = vacinas.find((v) => v.id === vacina_id);
+      if (!vacina) return erro('NAO_ENCONTRADO', 'Vacina não encontrada.');
+      const proxima = new Date(Date.parse(`${data}T00:00:00Z`) + vacina.intervalo_reforco_dias * 86400000);
+      return ok({ id: 'ap2', proxima_dose: proxima.toISOString().slice(0, 10) });
+    },
+    'orcamentos:obter': (dados) => {
+      const orcamento = orcamentos.find((o) => o.id === (dados as { id: string }).id);
+      return orcamento ? ok(orcamento) : erro('NAO_ENCONTRADO', 'Orçamento não encontrado.');
+    },
     'dashboard:resumo': () => ok<ResumoInicio>({ agenda_hoje: [], alertas_estoque: [], vacinas_proximas: fila, pendencias_sync: 0 }),
     'cep:buscar': (dados) => {
       const { cep } = dados as { cep: string };
@@ -26,7 +61,6 @@ export function criarMockTrilha4(): Record<string, HandlerMockTrilha4> {
       return ok<Endereco>({ cep, logradouro: 'Rua de Exemplo', bairro: 'Centro', cidade: 'Limeira', uf: 'SP' });
     },
     'whatsapp:abrir': () => ok({}),
-    'vacinas:catalogo_listar': () => pagina(vacinas),
     'vacinas:fila': () => ok(fila),
     'vacinas:lembrete_registrar': (dados) => {
       const item = fila.find((v) => v.id === (dados as { id: string }).id);
@@ -34,7 +68,6 @@ export function criarMockTrilha4(): Record<string, HandlerMockTrilha4> {
       item.lembrete_enviado = true;
       return ok({});
     },
-    'servicos:listar': () => pagina(servicos),
     'orcamentos:listar': () => pagina(orcamentos),
     'orcamentos:criar': (dados) => {
       const d = dados as Pick<Orcamento, 'itens' | 'desconto_centavos' | 'forma_pagamento'>;
