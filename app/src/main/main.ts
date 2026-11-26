@@ -29,7 +29,8 @@ class Aplicacao {
     if (process.argv.includes('--configurar-mysql')) {
       try {
         provisionarMysql();
-        app.exit(0);
+        // O Chromium persiste a chave do safeStorage ao encerrar normalmente.
+        app.quit();
       } catch {
         dialog.showErrorBox('Configuração MySQL', 'Confira os campos da conexão e a disponibilidade do cofre de credenciais.');
         app.exit(1);

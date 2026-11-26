@@ -34,4 +34,4 @@ Credenciais e migrações de produção são administradas pelo grupo. Para veri
 
 Execute `pnpm -r typecheck`, `pnpm -r lint` e `pnpm -r test`. A suíte de integração usa bancos SQLite em arquivo e uma instância MySQL isolada. Depois de aplicar as duas migrations em um schema vazio com prefixo `teste_sync_`, passe `TESTE_MYSQL_SYNC_PORTA` e `TESTE_MYSQL_SYNC_BANCO` para rodar a integração. Se o servidor exigir TLS com CA privada, passe o conteúdo PEM em `TESTE_MYSQL_SYNC_CA`. O teste usa exclusivamente a interface de loopback e a conta root do servidor descartável.
 
-O workflow `Validação da Trilha 1` testa as migrations do contêiner MySQL e gera o NSIS em uma VM Windows nova. O smoke test instala o executável, entra com a conta MASTER de teste e cria um backup local com o renderer offline.
+O workflow `Validação da Trilha 1` testa as migrations do contêiner MySQL e gera o NSIS em uma VM Windows nova. O teste instala o executável, entra com a conta MASTER de teste, cria um backup local com o renderer offline e confirma que um novo processo abre as credenciais do cofre. O instalador aprovado fica disponível nos artefatos da execução.

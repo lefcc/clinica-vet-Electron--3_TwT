@@ -6,7 +6,7 @@
 ## 1. Status Geral
 - **Arquitetura ativa:** Offline-First — Electron (`main` em TypeScript + IPC + `preload.ts`) + Front HTML/CSS/TS puro (Vite) + SQLite local (`better-sqlite3` + Drizzle) + Sincronização com MySQL 8 em nuvem (`mysql2` + Drizzle).
 - **Fase atual:** Semana 1 — Fundação (Dias 1–7).
-- **Última atualização:** 24/11/2026 (entrega da Trilha 1 na branch `feat/trilha1-dev-a`).
+- **Última atualização:** 25/11/2026 (entrega da Trilha 1 na branch `feat/trilha1-dev-a`).
 
 ---
 
@@ -48,7 +48,7 @@
 - [ ] **4.2 (Dev C)** Lista de compras sugerida e relatórios de estoque/validade (PDF/CSV)
 - [ ] **4.3 (Dev B)** Importação e exportação CSV (clientes/animais)
 - [x] **4.4 (Dev A)** Backup local agendado do SQLite e teste de restauração
-- [ ] **4.5 (Dev A)** Instalador Windows NSIS (`electron-builder`) testado offline em máquina limpa
+- [x] **4.5 (Dev A)** Instalador Windows NSIS (`electron-builder`) testado offline em VM limpa no GitHub Actions
 - [ ] **4.6 (Dev D)** Polimento de UX, atalhos e teste com usuário leigo
 - [ ] **4.7 (Todos)** QA ponta a ponta (3 perfis, 2+ PCs, offline/online), manual curto, README e entrega
 

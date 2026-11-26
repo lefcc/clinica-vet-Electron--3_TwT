@@ -52,5 +52,12 @@ jobs:
           pnpm install --frozen-lockfile --ignore-scripts
           pnpm --filter @clinica-vet/app exec node -e "require(require.resolve('electron/install.js'))"
           pnpm --filter @clinica-vet/app build --win nsis --x64 --publish never
-      - name: Instalar, autenticar e fazer backup offline
+      - name: Testar login, backup offline e reabertura do cofre
         run: node scripts/verificar-instalador.mjs
+      - name: Disponibilizar o instalador verificado
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Clinica-Veterinaria-Setup-1.0.0
+          path: app/release/Clinica-Veterinaria-Setup-1.0.0.exe
+          if-no-files-found: error
+          compression-level: 0
