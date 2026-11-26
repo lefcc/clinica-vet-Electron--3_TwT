@@ -197,8 +197,9 @@ function abrirNovoOrcamento(aoSalvar: () => void): void {
 // o main gera o pdf (printToPDF)
 async function gerarPdf(o: Orcamento): Promise<void> {
   const r = await api.invoke<{ caminho: string }>('orcamentos:pdf', { id: o.id });
-  if (!r.ok) return mostrarToast('erro', r.erro.mensagem);
-  mostrarToast('sucesso', `PDF do orçamento nº ${o.numero} gerado.`);
+  // cancelar o "salvar como" não é erro
+  if (!r.ok) return mostrarToast(r.erro.codigo === 'PDF_CANCELADO' ? 'info' : 'erro', r.erro.mensagem);
+  mostrarToast('sucesso', `PDF do orçamento nº ${o.numero} salvo.`);
 }
 
 // aba com a lista de orçamentos
