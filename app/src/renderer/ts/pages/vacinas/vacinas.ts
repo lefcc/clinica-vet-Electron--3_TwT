@@ -58,11 +58,14 @@ function abaFila(): HTMLElement {
         },
       },
       { chave: 'lembrete_enviado', titulo: 'Lembrete', render: (v) => criarBadge(v.lembrete_enviado ? 'Enviado' : 'Pendente', v.lembrete_enviado ? 'sucesso' : 'aviso') },
-      {
-        chave: 'acoes',
-        titulo: 'Ações',
-        render: (v) => criarBotao({ texto: v.lembrete_enviado ? 'Reenviar' : 'Enviar WhatsApp', icone: 'whatsapp', variante: v.lembrete_enviado ? 'secundario' : 'primario', onClick: () => void enviarLembrete(v, () => void carregar()) }),
-      },
+      // veterinário não envia lembrete (o main também barra)
+      ...(perfilAtual() === 'VETERINARIO'
+        ? []
+        : [{
+            chave: 'acoes',
+            titulo: 'Ações',
+            render: (v: VacinaFila) => criarBotao({ texto: v.lembrete_enviado ? 'Reenviar' : 'Enviar WhatsApp', icone: 'whatsapp', variante: v.lembrete_enviado ? 'secundario' : 'primario', onClick: () => void enviarLembrete(v, () => void carregar()) }),
+          }]),
     ],
   });
   async function carregar(): Promise<void> {
