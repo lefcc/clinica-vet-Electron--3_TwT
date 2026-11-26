@@ -1,7 +1,5 @@
 // avisa o typescript que existe window.api (criado pelo preload)
-interface ElectronAPI {
-  invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
-}
+type ElectronAPI = Readonly<Record<string, ((dados?: unknown) => Promise<unknown>) | undefined>>;
 
 interface Window {
   api: ElectronAPI;

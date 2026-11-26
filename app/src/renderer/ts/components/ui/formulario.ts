@@ -80,7 +80,7 @@ function criarControle(def: DefCampo):HTMLInputElement | HTMLSelectElement | HTM
 
 /** devolve o erro de um campo, ou nada se estiver ok */
 function validarCampo(def: DefCampo, valor: string, todos: Record<string, string>): string | undefined {
-  const texto = valor.trim();
+  const texto = def.tipo === 'senha' ? valor : valor.trim();
   // vazio: erro se obrigatório; senão roda só a regra do campo
   if (!texto) return def.obrigatorio ? 'Campo obrigatório.' : def.validar?.('', todos);
   switch (def.tipo) {
@@ -130,7 +130,9 @@ export function criarFormulario(definicoes: DefCampo[], criando = true): Formula
 
   const obterValores = (): Record<string, string> => {
     const valores: Record<string, string> = {};
-    for (const [nome, { controle }] of campos) valores[nome] = controle.value.trim();
+    for (const [nome, { def, controle }] of campos) {
+      valores[nome] = def.tipo === 'senha' ? controle.value : controle.value.trim();
+    }
     return valores;
   };
 

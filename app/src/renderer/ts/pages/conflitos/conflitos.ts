@@ -8,6 +8,12 @@ import { confirmar, criarBadge, criarBotao, criarCabecalhoPagina, criarEstadoVaz
 const TIPOS: Record<string, string> = {
   AGENDA_SOBREPOSTA: 'Horários da agenda sobrepostos',
   EDICAO_CONCORRENTE: 'Mesmo registro editado em dois computadores',
+  CPF_DUPLICADO: 'CPF já cadastrado no servidor',
+  LOGIN_DUPLICADO: 'Login já cadastrado no servidor',
+  ESTOQUE_INSUFICIENTE: 'Saldo insuficiente no servidor',
+  ULTIMO_MASTER: 'O servidor precisa manter um administrador ativo',
+  RESTRICAO_LOCAL: 'O registro central conflita com dados deste computador',
+  RESTRICAO_CENTRAL: 'O servidor recusou o registro',
 };
 
 // um dos lados do conflito (local ou servidor)
@@ -26,7 +32,7 @@ export function paginaConflitos(): HTMLElement {
   async function resolver(c: Conflito, escolha: 'LOCAL' | 'CENTRAL'): Promise<void> {
     const sim = await confirmar({
       titulo: 'Resolver conflito',
-      mensagem: escolha === 'LOCAL' ? 'Manter a versão deste computador? A versão do servidor será substituída.' : 'Manter a versão do servidor? A versão deste computador será descartada.',
+      mensagem: escolha === 'LOCAL' ? 'Reenviar a versão deste computador? O servidor vai conferir as regras e a versão atual antes de aceitar.' : 'Manter a versão do servidor? A versão deste computador será descartada.',
       textoConfirmar: 'Resolver',
     });
     if (!sim) return;

@@ -1,11 +1,19 @@
 // Configuração de ambiente - carregamento de variáveis
 import * as path from 'path';
+import { mkdirSync } from 'node:fs';
 import * as dotenv from 'dotenv';
 import { app } from 'electron';
 
+const perfilLocal = app.commandLine?.getSwitchValue('user-data-dir');
+if (perfilLocal) {
+  const caminho = path.resolve(perfilLocal);
+  mkdirSync(caminho, { recursive: true });
+  app.setPath('userData', caminho);
+}
+
 // carrega o .env (padrão da aula, com dotenv). procura na pasta do app e na raiz do projeto.
 // se o arquivo não existir, tudo bem: valem os valores padrão logo abaixo
-if (process.env.NODE_ENV !== 'production') {
+if (!app.isPackaged && process.env.NODE_ENV !== 'production') {
   for (const pasta of [process.cwd(), path.resolve(process.cwd(), '..')]) {
     dotenv.config({ path: path.join(pasta, '.env') });
   }
@@ -23,10 +31,12 @@ interface Config {
     password: string;
     database: string;
     ssl: boolean;
+    ca?: string;
   };
 
   // Sincronização
   sync: {
+    habilitado: boolean;
     intervalMs: number;
     batchSize: number;
   };
@@ -59,15 +69,13 @@ function getEnv(key: string, defaultValue?: string): string {
   return value;
 }
 
-function getEnvNumber(key: string, defaultValue?: number): number {
+function getEnvNumber(key: string, padrao: number, minimo: number, maximo = Number.MAX_SAFE_INTEGER): number {
   const value = process.env[key];
-  if (value === undefined) {
-    if (defaultValue !== undefined) return defaultValue;
-    throw new Error(`Variável de ambiente numérica obrigatória não definida: ${key}`);
-  }
+  if (value === undefined || value.trim() === '') return padrao;
   const parsed = Number(value);
-  if (Number.isNaN(parsed)) {
-    throw new Error(`Variável de ambiente ${key} deve ser um número: ${value}`);
+  if (!Number.isSafeInteger(parsed) || parsed < minimo || parsed > maximo) {
+    console.warn(`Configuração ${key} inválida. Usando o valor padrão.`);
+    return padrao;
   }
   return parsed;
 }
@@ -86,7 +94,7 @@ export const config: Config = {
 
   mysql: {
     host: getEnv('MYSQL_HOST', 'localhost'),
-    port: getEnvNumber('MYSQL_PORT', 3306),
+    port: getEnvNumber('MYSQL_PORT', 3306, 1, 65535),
     user: getEnv('MYSQL_USER', 'clinica'),
     password: getEnv('MYSQL_PASSWORD', 'clinica123'),
     database: getEnv('MYSQL_DATABASE', 'clinica_vet'),
@@ -94,17 +102,18 @@ export const config: Config = {
   },
 
   sync: {
-    intervalMs: getEnvNumber('SYNC_INTERVAL_MS', 300000),
-    batchSize: getEnvNumber('SYNC_BATCH_SIZE', 100)
+    habilitado: !app.isPackaged && getEnvBoolean('SYNC_HABILITADO', false),
+    intervalMs: getEnvNumber('SYNC_INTERVAL_MS', 60000, 1000),
+    batchSize: getEnvNumber('SYNC_BATCH_SIZE', 100, 1, 1000)
   },
 
   dolar: {
     apiUrl: getEnv('DOLAR_API_URL', 'https://economia.awesomeapi.com.br/json/last/USD-BRL'),
-    fetchIntervalMs: getEnvNumber('DOLAR_FETCH_INTERVAL_MS', 3600000)
+    fetchIntervalMs: getEnvNumber('DOLAR_FETCH_INTERVAL_MS', 3600000, 1)
   },
 
-  bcryptCost: getEnvNumber('BCRYPT_COST', 10),
-  sessionTtlHours: getEnvNumber('SESSION_TTL_HOURS', 8),
+  bcryptCost: getEnvNumber('BCRYPT_COST', 10, 10, 15),
+  sessionTtlHours: getEnvNumber('SESSION_TTL_HOURS', 8, 1),
 
   usuarioExemplo: {
     login: process.env.SEED_MASTER_LOGIN,

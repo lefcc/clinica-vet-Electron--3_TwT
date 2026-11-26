@@ -13,11 +13,13 @@ export function getCentralPool(): mysql.Pool {
     user: config.mysql.user,
     password: config.mysql.password,
     database: config.mysql.database,
-    ssl: config.mysql.ssl ? { rejectUnauthorized: false } : undefined,
+    ssl: config.mysql.ssl ? { rejectUnauthorized: true, verifyIdentity: true, ca: config.mysql.ca } : undefined,
     waitForConnections: true,
     connectionLimit: 10,
+    connectTimeout: 5000,
     queueLimit: 0,
     charset: 'utf8mb4',
+    dateStrings: ['DATE'],
     timezone: '+00:00'
   });
 
@@ -35,9 +37,12 @@ export async function testCentralConnection(): Promise<boolean> {
   try {
     const pool = getCentralPool();
     const connection = await pool.getConnection();
-    await connection.ping();
-    connection.release();
-    return true;
+    try {
+      await connection.ping();
+      return true;
+    } finally {
+      connection.release();
+    }
   } catch {
     return false;
   }
@@ -50,12 +55,13 @@ export async function runInTransaction<T>(
   const pool = getCentralPool();
   const connection = await pool.getConnection();
   try {
+    await connection.query("SET time_zone = '+00:00'");
     await connection.beginTransaction();
     const result = await fn(connection);
     await connection.commit();
     return result;
   } catch (error) {
-    await connection.rollback();
+    try { await connection.rollback(); } catch { connection.destroy(); }
     throw error;
   } finally {
     connection.release();

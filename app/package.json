@@ -1,22 +1,25 @@
 {
   "name": "@clinica-vet/app",
   "version": "1.0.0",
+  "description": "Sistema de gestão offline da clínica veterinária",
+  "author": "Equipe Clínica Veterinária",
   "private": true,
   "main": "dist/main/main.js",
   "scripts": {
     "dev": "pnpm build:tsc && electron .",
-    "build": "pnpm build:tsc && electron-builder",
-    "build:tsc": "tsc && pnpm build:renderer",
-    "build:renderer": "node scripts/build-renderer.js",
-    "typecheck": "tsc --noEmit",
+    "build": "pnpm build:tsc && pnpm rebuild:sqlite && electron-builder",
+    "build:tsc": "pnpm --filter @clinica-vet/shared build && tsc && node scripts/build-main-assets.js && node scripts/build-renderer.js",
+    "build:renderer": "pnpm --filter @clinica-vet/shared build && node scripts/build-renderer.js",
+    "typecheck": "pnpm --filter @clinica-vet/shared build && tsc --noEmit && tsc --noEmit -p tsconfig.renderer.json",
     "lint": "eslint src --ext .ts",
-    "test": "vitest run",
+    "test": "pnpm --filter @clinica-vet/shared build && node scripts/test.js",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
-    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
-    "db:push": "drizzle-kit push --config=drizzle.config.ts",
-    "db:studio": "drizzle-kit studio --config=drizzle.config.ts",
-    "postinstall": "electron-rebuild -f -w better-sqlite3"
+    "db:migrate": "node scripts/sqlite-kit.js migrate",
+    "db:push": "node scripts/sqlite-kit.js push",
+    "db:studio": "node scripts/sqlite-kit.js studio",
+    "rebuild:sqlite": "node scripts/rebuild-sqlite.js",
+    "postinstall": "pnpm rebuild:sqlite"
   },
   "dependencies": {
     "@clinica-vet/shared": "workspace:*",
@@ -24,8 +27,6 @@
     "better-sqlite3": "^11.0.0",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.33.0",
-    "electron": "^30.0.0",
-    "electron-rebuild": "^3.2.9",
     "mysql2": "^3.11.0",
     "node-cron": "^3.0.3",
     "zod": "^3.23.0"
@@ -36,7 +37,9 @@
     "@types/node": "^22.0.0",
     "@types/node-cron": "^3.0.11",
     "drizzle-kit": "^0.24.0",
+    "electron": "30.5.1",
     "electron-builder": "^24.13.0",
+    "electron-rebuild": "^3.2.9",
     "eslint": "^9.0.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.0.0",
@@ -45,6 +48,8 @@
   "build": {
     "appId": "com.clinicavet.app",
     "productName": "Clínica Veterinária",
+    "npmRebuild": false,
+    "asarUnpack": ["**/*.node"],
     "directories": {
       "output": "release",
       "buildResources": "buildResources"
@@ -61,6 +66,8 @@
     },
     "nsis": {
       "oneClick": false,
+      "artifactName": "Clinica-Veterinaria-Setup-${version}.${ext}",
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true

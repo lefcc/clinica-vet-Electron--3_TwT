@@ -23,5 +23,5 @@ export function closeLocalDb(): void {
 export function runInTransaction<T>(fn: (db: Database.Database) => T): T {
   const db = getLocalDb();
   const transaction = db.transaction(fn);
-  return transaction(db);
+  return transaction.immediate(db);
 }

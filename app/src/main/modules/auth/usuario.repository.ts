@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { BancoSql } from '../../db/banco-sql';
 import type { Perfil } from './tipos';
+import { OutboxRepository } from '../admin/outbox.repository';
 
 export interface UsuarioComColaborador {
   id: string;
@@ -39,7 +40,12 @@ interface LinhaUsuario {
 
 // aqui é o único lugar com SQL do login (regra do projeto: SQL só no repository)
 export class UsuarioRepository implements RepositorioUsuarios {
-  constructor(private readonly banco: BancoSql) {}
+  constructor(private readonly banco: BancoSql, private readonly publicarSeed = false) {}
+
+  pertenceAoColaborador(usuarioId: string, colaboradorId: string): boolean {
+    return Boolean(this.banco.prepare('SELECT 1 FROM usuarios WHERE id = ? AND colaborador_id = ?')
+      .get(usuarioId, colaboradorId));
+  }
 
   buscarAtivoPorLogin(login: string): UsuarioComColaborador | undefined {
     // os "?" evitam SQL injection: o valor nunca vira parte do comando
@@ -68,7 +74,6 @@ export class UsuarioRepository implements RepositorioUsuarios {
   }
 
   // cria o colaborador e o usuário juntos: ou grava os dois, ou nenhum
-  // TODO: quando existir a sync_outbox, gravar nela na mesma transação
   criar(novo: NovoUsuario): void {
     const colaboradorId = randomUUID();
     const usuarioId = randomUUID();
@@ -77,6 +82,13 @@ export class UsuarioRepository implements RepositorioUsuarios {
       this.banco
         .prepare('INSERT INTO usuarios (id, colaborador_id, login, senha_hash, perfil) VALUES (?, ?, ?, ?, ?)')
         .run(usuarioId, colaboradorId, novo.login, novo.senhaHash, novo.perfil);
+      if (this.publicarSeed) {
+        const outbox = new OutboxRepository(this.banco);
+        const colaborador = this.banco.prepare('SELECT * FROM colaboradores WHERE id = ?').get(colaboradorId) as object;
+        const usuario = this.banco.prepare('SELECT * FROM usuarios WHERE id = ?').get(usuarioId) as object;
+        outbox.enfileirar('colaboradores', colaboradorId, 'inserir', colaborador);
+        outbox.enfileirar('usuarios', usuarioId, 'inserir', usuario);
+      }
     });
   }
 }

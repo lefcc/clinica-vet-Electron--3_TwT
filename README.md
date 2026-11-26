@@ -83,18 +83,15 @@ cp .env.example .env
 # Gerar migrations (SQLite)
 pnpm db:generate
 
-# Aplicar migrations (SQLite)
+# Aplicar migrations em um SQLite de desenvolvimento (o app faz isso ao abrir)
+export SQLITE_PATH=/caminho/absoluto/clinica-vet.sqlite
 pnpm db:migrate
-
-# Gerar migrations (MySQL)
-pnpm --filter app db:generate -- --config=drizzle.config.mysql.ts
-
-# Aplicar migrations (MySQL)
-pnpm --filter app db:migrate -- --config=drizzle.config.mysql.ts
 
 # Iniciar em desenvolvimento
 pnpm dev
 ```
+
+O contêiner MySQL aplica as migrations centrais na criação de um volume vazio. As instruções para sincronização, credenciais e instalador Windows estão no [guia da Trilha 1](docs/SINCRONIZACAO.md).
 
 ## Rodando só o app (front + login de exemplo) no Windows
 
@@ -120,19 +117,9 @@ Se terminar sem erro, vá para o passo 4. Se der `ELIFECYCLE` em `better-sqlite3
 
 ```powershell
 pnpm install --ignore-scripts
-cd app
-node node_modules/electron/install.js
-node -e "console.log(require('electron/package.json').version); console.log(path.dirname(require.resolve('better-sqlite3/package.json')))"
+pnpm --filter @clinica-vet/app exec node -e "require(require.resolve('electron/install.js'))"
+pnpm --filter @clinica-vet/app rebuild:sqlite
 ```
-
-A saída tem duas linhas: a versão do Electron (ex.: `30.5.1`) e o caminho do `better-sqlite3`. Entre nessa pasta e baixe o binário, trocando `VERSAO` e `CAMINHO` pelo que saiu:
-
-```powershell
-cd "CAMINHO"
-npx prebuild-install --runtime=electron --target=VERSAO --arch=x64
-```
-
-Depois volte para a pasta `app`. A alternativa é instalar o Visual Studio Build Tools com a carga "Desenvolvimento para desktop com C++" e rodar `pnpm install` de novo.
 
 **4. Abrir o app:**
 
@@ -142,7 +129,7 @@ pnpm --filter "@clinica-vet/app" dev
 
 (ou `pnpm dev` dentro da pasta `app`). O script se chama `dev`, não `start`.
 
-**Login de exemplo:** em desenvolvimento, ao abrir o app o arquivo `app/src/main/db/local/seed-usuario-exemplo.ts` cria um usuário MASTER de exemplo no SQLite local. O login e a senha estão nesse arquivo. Para usar outros, copie `.env.example` para `.env` e preencha as variáveis `SEED_MASTER_*`. O app empacotado não cria usuário nenhum.
+**Login de exemplo:** em desenvolvimento, ao abrir o app o arquivo `app/src/main/db/local/seed-usuario-exemplo.ts` cria um usuário MASTER de exemplo no SQLite local. O login e a senha estão nesse arquivo. Para usar outros, copie `.env.example` para `.env` e preencha as variáveis `SEED_MASTER_*`. Na versão instalada, configure o primeiro MASTER conforme o [guia de instalação](docs/SINCRONIZACAO.md).
 
 **Problemas comuns**
 

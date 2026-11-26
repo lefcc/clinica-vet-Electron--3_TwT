@@ -1,4 +1,5 @@
 import { mostrarToast } from '../components/ui/toast.js';
+import { obterSessao } from './sessao.js';
 
 export type IPCResponse<T> =
   | { ok: true; dados: T }
@@ -15,8 +16,12 @@ export function definirAoSessaoExpirada(funcao: () => void): void {
 
 // pega o window.api (do preload), se existir
 function obterInvocador(): Invocador | null {
-  const real = (window as { api?: { invoke: Invocador } }).api;
-  return real ? (canal, dados) => real.invoke(canal, dados) : null;
+  const real = window.api;
+  return real ? (canal, dados) => {
+    const chamar = Object.hasOwn(real, canal) ? real[canal] : undefined;
+    if (!chamar) return Promise.reject(new Error('Canal não permitido: ' + canal));
+    return chamar(dados);
+  } : null;
 }
 
 // nesses canais "não autenticado" é normal (ainda sem login)
@@ -25,6 +30,7 @@ const CANAIS_DE_LOGIN = new Set(['auth:login', 'auth:sessao', 'auth:sair']);
 const api = {
   // nunca lança erro: devolve { ok: false, ... } se der problema
   async invoke<T>(canal: string, dados?: unknown): Promise<IPCResponse<T>> {
+    const sessaoDaConsulta = obterSessao();
     // sem back-end conectado, devolve um erro claro
     const invocar = obterInvocador();
     if (!invocar) {
@@ -32,7 +38,8 @@ const api = {
     }
     try {
       const resposta = (await invocar(canal, dados)) as IPCResponse<T>;
-      if (!resposta.ok && !CANAIS_DE_LOGIN.has(canal) && ['NAO_AUTENTICADO', 'SESSAO_EXPIRADA'].includes(resposta.erro.codigo)) {
+      if (!resposta.ok && sessaoDaConsulta && sessaoDaConsulta === obterSessao()
+        && !CANAIS_DE_LOGIN.has(canal) && ['NAO_AUTENTICADO', 'SESSAO_EXPIRADA'].includes(resposta.erro.codigo)) {
         aoSessaoExpirada?.();
       }
       return resposta;
@@ -40,7 +47,7 @@ const api = {
       const texto = erro instanceof Error ? erro.message : '';
       // o electron diz isso (em inglês) quando o canal não foi registrado
       if (texto.includes('No handler registered')) {
-        return { ok: false, erro: { codigo: 'CANAL_NAO_IMPLEMENTADO', mensagem: `O back-end ainda não implementou esta função (${canal}).` } };
+        return { ok: false, erro: { codigo: 'CANAL_NAO_IMPLEMENTADO', mensagem: 'Esta função ainda está em desenvolvimento nesta versão.' } };
       }
       return { ok: false, erro: { codigo: 'IPC_ERROR', mensagem: texto || 'Erro desconhecido na comunicação com o sistema.' } };
     }

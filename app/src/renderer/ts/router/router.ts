@@ -1,4 +1,4 @@
-import { criarEstadoVazio } from '../components/ui/index.js';
+import { criarEstadoVazio, criarSpinner } from '../components/ui/index.js';
 import { encontrarItem, podeAcessar, type Perfil } from '../layout/menu.config.js';
 
 /** desenha uma tela (parametro vem de rotas como #/clientes/123) */
@@ -27,8 +27,10 @@ export function dividirRota(rota: string): { base: string; parametro?: string } 
 // troca a tela quando o endereço muda, conferindo a rota e o perfil
 export function iniciarRoteador(opcoes: OpcoesRoteador): { navegar: (rota: string) => void; parar: () => void } {
   const { perfil, container, paginas, aoNavegar } = opcoes;
+  let renderAtual = 0;
 
   async function renderizar(): Promise<void> {
+    const render = ++renderAtual;
     const { base, parametro } = dividirRota(rotaDoHash(window.location.hash));
     aoNavegar?.(base);
     container.replaceChildren();
@@ -49,8 +51,19 @@ export function iniciarRoteador(opcoes: OpcoesRoteador): { navegar: (rota: strin
       return;
     }
     // 3) tudo certo: desenha e leva o foco pro conteúdo
-    container.append(await pagina(parametro));
-    container.focus();
+    container.replaceChildren(criarSpinner());
+    try {
+      const conteudo = await pagina(parametro);
+      if (render !== renderAtual) return;
+      container.replaceChildren(conteudo);
+      container.focus();
+    } catch {
+      if (render !== renderAtual) return;
+      container.replaceChildren(criarEstadoVazio({
+        icone: 'aviso', titulo: 'Não foi possível carregar esta tela',
+        descricao: 'Abra a tela novamente pelo menu.'
+      }));
+    }
   }
 
   const aoMudarHash = (): void => void renderizar();
@@ -62,6 +75,7 @@ export function iniciarRoteador(opcoes: OpcoesRoteador): { navegar: (rota: strin
       window.location.hash = `#/${rota}`;
     },
     parar() {
+      renderAtual++;
       window.removeEventListener('hashchange', aoMudarHash);
     },
   };

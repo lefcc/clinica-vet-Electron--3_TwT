@@ -7,15 +7,15 @@ import type { BancoSql, ComandoSql } from '../banco-sql';
 export class ConexaoLocal implements BancoSql {
   private banco: Database.Database | null = null;
 
-  constructor(private readonly caminho: string) {}
+  constructor(readonly caminhoArquivo: string) {}
 
   abrir(): void {
     if (this.banco) return;
 
     // garante que a pasta do arquivo existe
-    fs.mkdirSync(path.dirname(this.caminho), { recursive: true });
+    if (this.caminhoArquivo !== ':memory:') fs.mkdirSync(path.dirname(this.caminhoArquivo), { recursive: true });
 
-    const banco = new Database(this.caminho);
+    const banco = new Database(this.caminhoArquivo);
     banco.pragma('journal_mode = WAL');
     banco.pragma('synchronous = NORMAL');
     banco.pragma('foreign_keys = ON');
@@ -47,7 +47,7 @@ export class ConexaoLocal implements BancoSql {
   }
 
   transacao<T>(funcao: () => T): T {
-    return this.obter().transaction(funcao)();
+    return this.obter().transaction(funcao).immediate();
   }
 
   private obter(): Database.Database {
