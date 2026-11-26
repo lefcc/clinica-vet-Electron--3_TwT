@@ -1,4 +1,3 @@
-// regras do orçamento: o total é sempre calculado aqui no main, em centavos
 import type { ItemOrcamento, Orcamento } from '@clinica-vet/shared';
 import type { BancoSql } from '../../db/banco-sql';
 import { ErroNegocio } from '../../erros/erro-negocio';
@@ -16,7 +15,7 @@ export interface EntradaOrcamento {
 
 const MAXIMO_CENTAVOS = 2147483647;
 
-/** soma dos itens menos o desconto, nunca negativo */
+// esta função calcula o total em centavos
 export function calcularTotal(itens: Pick<ItemOrcamento, 'quantidade' | 'valor_unitario_centavos'>[], desconto: number): number {
   const soma = itens.reduce((total, i) => total + i.quantidade * i.valor_unitario_centavos, 0);
   return Math.max(0, soma - desconto);
@@ -39,11 +38,11 @@ export class OrcamentosService {
     return orcamento;
   }
 
+  // esta função cria o orçamento
   criar(entrada: EntradaOrcamento): Orcamento {
     const total = calcularTotal(entrada.itens, entrada.desconto_centavos);
     if (total > MAXIMO_CENTAVOS) throw new ErroNegocio('DADOS_INVALIDOS', 'O valor do orçamento é alto demais.');
 
-    // número, orçamento, itens e fila de sync na mesma transação
     return runInTransaction(this.banco, () => {
       if (!this.repository.clienteAtivo(entrada.cliente_id)) throw new ErroNegocio('NAO_ENCONTRADO', 'Cliente não encontrado.');
       if (entrada.animal_id && !this.repository.animalDoCliente(entrada.animal_id, entrada.cliente_id)) {

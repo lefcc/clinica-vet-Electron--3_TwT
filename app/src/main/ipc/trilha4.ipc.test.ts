@@ -1,4 +1,3 @@
-// testa a trilha 4 inteira pelo ipc, com um sqlite de verdade na memória
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConexaoLocal } from '../db/local/conexao-local';
 import { EsquemaLocal } from '../db/local/esquema-local';
@@ -148,7 +147,6 @@ describe('Trilha 4 pelo IPC', () => {
   });
 
   it('csv: importa, ignora cpf repetido e exporta sem virar fórmula no excel', async () => {
-    // com o BOM do excel e o cabeçalho entre aspas
     const clientes = String.fromCharCode(0xfeff) + '"nome";cpf;telefone\r\n"=Maria; Silva";444.444.444-44;(19) 98888-7777\r\nCarlos de novo;33333333333;19999998888\r\nSem telefone;55555555555;';
     expect((await chamar('csv:importar', { entidade: 'clientes', conteudo: clientes })).dados).toEqual({ importados: 1, ignorados: 2 });
     const animais = 'cliente_cpf;nome;especie;sexo;data_nascimento;peso_kg\n44444444444;Mia;Gato;f;2024-05-10;3,5\n44444444444;Mia;Gato;f;;\n00000000000;Sem dono;Cão;M;;';

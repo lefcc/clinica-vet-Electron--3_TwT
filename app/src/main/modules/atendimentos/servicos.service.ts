@@ -1,4 +1,3 @@
-// regras do catálogo de serviços (quem pode escrever é decidido no ipc)
 import type { Servico } from '@clinica-vet/shared';
 import type { BancoSql } from '../../db/banco-sql';
 import { ErroNegocio } from '../../erros/erro-negocio';
@@ -23,6 +22,7 @@ export class ServicosService {
     return servico;
   }
 
+  // esta função cadastra um serviço
   criar(dados: DadosServico): Servico {
     return runInTransaction(this.banco, () => {
       const id = this.repository.criar(dados);
@@ -31,6 +31,7 @@ export class ServicosService {
     });
   }
 
+  // esta função atualiza um serviço
   atualizar({ id, ...campos }: Partial<DadosServico> & { id: string }): Servico {
     return runInTransaction(this.banco, () => {
       const atual = this.obter(id);
@@ -40,6 +41,7 @@ export class ServicosService {
     });
   }
 
+  // esta função inativa um serviço
   inativar(id: string): void {
     runInTransaction(this.banco, () => {
       this.obter(id);

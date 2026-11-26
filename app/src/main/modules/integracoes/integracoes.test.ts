@@ -1,4 +1,3 @@
-// cep e pdf testados sem internet e sem janela
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

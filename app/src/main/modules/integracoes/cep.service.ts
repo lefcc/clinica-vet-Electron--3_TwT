@@ -1,4 +1,3 @@
-// busca de endereço no ViaCEP (só o main acessa a internet)
 import type { Endereco } from '@clinica-vet/shared';
 import { ErroNegocio } from '../../erros/erro-negocio';
 
@@ -13,6 +12,7 @@ interface RespostaViaCep {
 export class CepService {
   constructor(private readonly buscar: typeof fetch = fetch) {}
 
+  // esta função busca o endereço pelo cep
   async consultar(cep: string): Promise<Endereco> {
     if (!/^\d{8}$/.test(cep)) throw new ErroNegocio('CEP_INVALIDO', 'O CEP precisa ter 8 números.');
 

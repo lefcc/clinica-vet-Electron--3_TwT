@@ -1,4 +1,3 @@
-// importar e exportar clientes e animais em csv (separado por ";", que o excel brasileiro entende)
 import { AnimalCriarSchema, ClienteCriarSchema } from '@clinica-vet/shared';
 import type { BancoSql } from '../../db/banco-sql';
 import { ErroNegocio } from '../../erros/erro-negocio';
@@ -13,7 +12,7 @@ const COLUNAS: Record<EntidadeCsv, string[]> = {
   animais: ['cliente_cpf', 'nome', 'especie', 'raca', 'sexo', 'data_nascimento', 'peso_kg', 'observacoes']
 };
 
-// célula começando com = + - @ vira fórmula no excel, então ganha um apóstrofo na frente
+// esta função formata uma célula do csv
 function celula(valor: string | number | null | undefined): string {
   let texto = String(valor ?? '');
   if (/^[=+\-@]/.test(texto)) texto = `'${texto}`;
@@ -24,9 +23,8 @@ export function gerarCsv(colunas: string[], linhas: LinhaCsv[]): string {
   return [colunas.join(';'), ...linhas.map((l) => colunas.map((c) => celula(l[c])).join(';'))].join('\r\n');
 }
 
-/** lê o csv (com aspas) e devolve um objeto por linha, usando o cabeçalho como chave */
+// esta função lê o arquivo csv
 export function lerCsv(conteudo: string): Record<string, string>[] {
-  // tira a marca invisível (BOM) que o excel põe no começo do arquivo
   const texto = conteudo.charCodeAt(0) === 0xfeff ? conteudo.slice(1) : conteudo;
   const primeira = texto.split('\n')[0] ?? '';
   const separador = primeira.includes(';') ? ';' : ',';
@@ -56,7 +54,6 @@ export function lerCsv(conteudo: string): Record<string, string>[] {
     .map((l) => Object.fromEntries(chaves.map((chave, i) => [chave, (l[i] ?? '').trim().replace(/^'(?=[=+\-@])/, '')])));
 }
 
-// tira os campos vazios e deixa só as colunas que a gente conhece
 function limpar(registro: Record<string, string>, colunas: string[]): Record<string, string> {
   return Object.fromEntries(colunas.filter((c) => registro[c]).map((c) => [c, registro[c] as string]));
 }
@@ -70,12 +67,13 @@ export class CsvService {
     private readonly outbox: OutboxRepository
   ) {}
 
+  // esta função exporta o csv
   exportar(entidade: EntidadeCsv) {
     const linhas = entidade === 'clientes' ? this.repository.clientesParaCsv() : this.repository.animaisParaCsv();
     return { nome_arquivo: `${entidade}.csv`, conteudo: gerarCsv(COLUNAS[entidade], linhas) };
   }
 
-  // linha repetida ou com dado errado é ignorada; o resto entra
+  // esta função importa o csv
   importar(entidade: EntidadeCsv, conteudo: string) {
     const registros = lerCsv(conteudo);
     const obrigatoria = entidade === 'clientes' ? 'cpf' : 'cliente_cpf';
@@ -116,7 +114,6 @@ export class CsvService {
     if (!validado.success || this.repository.animalExiste(clienteId, validado.data.nome)) return false;
     const { data_nascimento, ...resto } = validado.data;
     const campos = Object.fromEntries(Object.entries(resto).filter(([, v]) => v !== undefined)) as Record<string, string | number>;
-    // no banco a data de nascimento fica em segundos
     const nascimento = data_nascimento ? Math.floor(Date.parse(`${data_nascimento}T00:00:00Z`) / 1000) : null;
     const { id, linha } = this.repository.inserir('animais', { ...campos, data_nascimento: nascimento });
     this.outbox.enfileirar('animais', id, 'inserir', linha);

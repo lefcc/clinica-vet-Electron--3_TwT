@@ -1,4 +1,3 @@
-// sql do catálogo de serviços
 import { randomUUID } from 'node:crypto';
 import type { Servico } from '@clinica-vet/shared';
 import type { BancoSql } from '../../db/banco-sql';
@@ -13,6 +12,7 @@ const COLUNAS = 'id, nome, valor_centavos, ativo';
 export class ServicosRepository {
   constructor(private readonly banco: BancoSql) {}
 
+  // esta função busca os serviços
   listar(busca: string, pagina: number, tamanho: number) {
     const filtro = 'WHERE ativo = 1 AND instr(lower(nome), lower(?)) > 0';
     const { total } = this.banco.prepare(`SELECT count(*) AS total FROM servicos ${filtro}`).get(busca) as { total: number };

@@ -1,4 +1,3 @@
-// todo o sql das vacinas fica aqui
 import { randomUUID } from 'node:crypto';
 import type { VacinaCatalogo, VacinaFila } from '@clinica-vet/shared';
 import type { BancoSql } from '../../db/banco-sql';
@@ -24,7 +23,6 @@ function paraVacina(linha: LinhaVacina): VacinaCatalogo {
 
 const COLUNAS = 'id, nome, descricao, intervalo_reforco_dias, ativo';
 
-// só a aplicação mais recente de cada vacina conta: se o animal já tomou o reforço, a antiga sai da fila
 const CONSULTA_FILA = `
   SELECT a.id, an.nome AS animal_nome, c.nome AS cliente_nome, c.telefone, v.nome AS vacina_nome, a.proxima_dose,
     EXISTS (SELECT 1 FROM lembretes_vacina l WHERE l.vacina_id = a.id AND l.status = 'enviado') AS lembrete_enviado
@@ -39,6 +37,7 @@ const CONSULTA_FILA = `
 export class VacinasRepository {
   constructor(private readonly banco: BancoSql) {}
 
+  // esta função busca as vacinas do catálogo
   listar(busca: string, pagina: number, tamanho: number) {
     const filtro = 'WHERE ativo = 1 AND instr(lower(nome), lower(?)) > 0';
     const { total } = this.banco.prepare(`SELECT count(*) AS total FROM vacinas_catalogo ${filtro}`).get(busca) as { total: number };
@@ -72,12 +71,12 @@ export class VacinasRepository {
     return Boolean(this.banco.prepare('SELECT 1 FROM animais WHERE id = ? AND ativo = 1').get(id));
   }
 
-  // quem está logado é um usuário, mas a aplicação guarda o colaborador
   colaboradorDoUsuario(usuarioId: string): string | undefined {
     const linha = this.banco.prepare('SELECT colaborador_id FROM usuarios WHERE id = ?').get(usuarioId) as { colaborador_id: string } | undefined;
     return linha?.colaborador_id;
   }
 
+  // esta função grava a aplicação
   aplicar(dados: NovaAplicacao): string {
     const id = randomUUID();
     this.banco.prepare(
@@ -86,6 +85,7 @@ export class VacinasRepository {
     return id;
   }
 
+  // esta função busca as vacinas que vencem no período
   fila(de: string, ate: string): VacinaFila[] {
     const linhas = this.banco.prepare(`${CONSULTA_FILA} AND a.proxima_dose BETWEEN ? AND ? ORDER BY a.proxima_dose, an.nome`)
       .all(de, ate) as LinhaFila[];
@@ -97,7 +97,7 @@ export class VacinasRepository {
     return linha && { ...linha, lembrete_enviado: Boolean(linha.lembrete_enviado) };
   }
 
-  // um lembrete por aplicação: se reenviar, só atualiza
+  // esta função grava o lembrete
   registrarLembrete(aplicacaoId: string, mensagem: string, telefone: string): { id: string; novo: boolean } {
     const agora = agoraEmSegundos();
     const existente = this.banco.prepare('SELECT id FROM lembretes_vacina WHERE vacina_id = ?').get(aplicacaoId) as { id: string } | undefined;
@@ -112,7 +112,6 @@ export class VacinasRepository {
     return { id, novo: true };
   }
 
-  // linha inteira, do jeito que vai pra fila de sincronização
   linha(tabela: 'vacinas_catalogo' | 'vacinas_aplicacoes' | 'lembretes_vacina', id: string): object {
     return this.banco.prepare(`SELECT * FROM ${tabela} WHERE id = ?`).get(id) as object;
   }

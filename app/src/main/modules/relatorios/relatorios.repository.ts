@@ -1,4 +1,3 @@
-// sql do painel, dos relatórios e do csv
 import { randomUUID } from 'node:crypto';
 import type { Agendamento } from '@clinica-vet/shared';
 import type { BancoSql } from '../../db/banco-sql';
@@ -11,7 +10,7 @@ export type LinhaCsv = Record<string, string | number | null>;
 export class RelatoriosRepository {
   constructor(private readonly banco: BancoSql) {}
 
-  // agenda entre dois instantes (em segundos). com usuarioId, só a agenda dessa pessoa
+  // esta função busca a agenda do período
   agenda(de: number, ate: number, usuarioId?: string): Agendamento[] {
     const filtro = usuarioId ? 'AND g.veterinario_id = (SELECT colaborador_id FROM usuarios WHERE id = ?)' : '';
     const linhas = this.banco.prepare(
@@ -65,7 +64,7 @@ export class RelatoriosRepository {
     return Boolean(this.banco.prepare('SELECT 1 FROM animais WHERE cliente_id = ? AND lower(nome) = lower(?) AND ativo = 1').get(clienteId, nome));
   }
 
-  // grava as colunas que já foram validadas pelo zod no service
+  // esta função grava um cliente ou animal importado
   inserir(tabela: 'clientes' | 'animais', dados: Record<string, string | number | null>): { id: string; linha: object } {
     const id = randomUUID();
     const colunas = ['id', ...Object.keys(dados)];

@@ -1,4 +1,3 @@
-// sql dos orçamentos e dos itens
 import { randomUUID } from 'node:crypto';
 import type { ItemOrcamento, Orcamento } from '@clinica-vet/shared';
 import type { BancoSql } from '../../db/banco-sql';
@@ -35,6 +34,7 @@ export class OrcamentosRepository {
     return { ...linha, animal_nome: linha.animal_nome ?? undefined, criado_em: dataUtc(linha.criado_em), itens };
   }
 
+  // esta função busca os orçamentos
   listar(busca: string, pagina: number, tamanho: number) {
     const filtro = `WHERE o.ativo = 1 AND (instr(lower(c.nome), lower(?)) > 0 OR instr(lower(coalesce(a.nome, '')), lower(?)) > 0)`;
     const { total } = this.banco.prepare(`SELECT count(*) AS total ${ORIGEM} ${filtro}`).get(busca, busca) as { total: number };
@@ -48,6 +48,7 @@ export class OrcamentosRepository {
     return linha && this.completar(linha);
   }
 
+  // esta função pega o próximo número
   proximoNumero(): number {
     const linha = this.banco.prepare('SELECT coalesce(max(numero), 0) + 1 AS numero FROM orcamentos').get() as { numero: number };
     return linha.numero;
@@ -61,7 +62,7 @@ export class OrcamentosRepository {
     return Boolean(this.banco.prepare('SELECT 1 FROM animais WHERE id = ? AND cliente_id = ? AND ativo = 1').get(animalId, clienteId));
   }
 
-  // nome do serviço ou medicamento, direto do banco (não confia no texto que veio da tela)
+  // esta função busca o nome do serviço ou medicamento
   nomeDoItem(tipo: ItemOrcamento['tipo'], id: string): string | undefined {
     const tabela = tipo === 'SERVICO' ? 'servicos' : 'medicamentos';
     const linha = this.banco.prepare(`SELECT nome FROM ${tabela} WHERE id = ? AND ativo = 1`).get(id) as { nome: string } | undefined;

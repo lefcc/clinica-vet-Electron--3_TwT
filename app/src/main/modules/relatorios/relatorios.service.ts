@@ -1,10 +1,8 @@
-// relatórios: cobranças, validade dos lotes e lista de compras
 import type { Lote, SaldoEstoque } from '@clinica-vet/shared';
 import type { RelatoriosRepository } from './relatorios.repository';
 
 const DIAS_DE_COMPRA = 30;
 
-// o estoque é da trilha 3: aqui só pergunta pra ele
 export interface FonteEstoque {
   calcularTodosSaldos(): SaldoEstoque[];
   lotes(entrada: { medicamento_id: string }): Lote[];
@@ -13,11 +11,12 @@ export interface FonteEstoque {
 export class RelatoriosService {
   constructor(private readonly repository: RelatoriosRepository, private readonly estoque: FonteEstoque) {}
 
+  // esta função lista as cobranças
   cobrancas() {
     return this.repository.cobrancas();
   }
 
-  // lotes com saldo, do que vence primeiro pro último
+  // esta função lista os lotes por validade
   estoqueValidade() {
     return this.estoque.calcularTodosSaldos()
       .flatMap((s) => this.estoque.lotes({ medicamento_id: s.medicamento_id })
@@ -25,7 +24,7 @@ export class RelatoriosService {
       .sort((a, b) => a.validade.localeCompare(b.validade));
   }
 
-  // o que está em atenção ou crítico, com a quantidade pra cobrir 30 dias
+  // esta função monta a lista de compras
   listaCompras() {
     return this.estoque.calcularTodosSaldos()
       .filter((s) => s.status !== 'OK')

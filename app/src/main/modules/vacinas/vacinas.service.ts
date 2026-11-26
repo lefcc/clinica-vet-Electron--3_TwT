@@ -1,4 +1,3 @@
-// regras das vacinas: catálogo, aplicação, fila dos próximos 3 dias e lembrete
 import type { VacinaCatalogo, VacinaFila } from '@clinica-vet/shared';
 import type { BancoSql } from '../../db/banco-sql';
 import { ErroNegocio } from '../../erros/erro-negocio';
@@ -8,12 +7,12 @@ import type { DadosVacina, VacinasRepository } from './vacinas.repository';
 
 export const DIAS_DE_AVISO = 3;
 
-/** soma dias numa data "2026-11-25" */
+// esta função soma dias a uma data
 export function somarDias(dia: string, quantidade: number): string {
   return new Date(Date.parse(`${dia}T00:00:00Z`) + quantidade * 86400000).toISOString().slice(0, 10);
 }
 
-/** troca {tutor}, {animal}, {vacina} e {data} no texto do lembrete */
+// esta função monta o texto do lembrete
 export function montarMensagem(modelo: string, item: VacinaFila): string {
   const valores: Record<string, string> = {
     tutor: item.cliente_nome,
@@ -43,6 +42,7 @@ export class VacinasService {
     return vacina;
   }
 
+  // esta função cadastra uma vacina
   catalogoCriar(dados: DadosVacina): VacinaCatalogo {
     return runInTransaction(this.banco, () => {
       const id = this.repository.criar(dados);
@@ -51,6 +51,7 @@ export class VacinasService {
     });
   }
 
+  // esta função atualiza uma vacina
   catalogoAtualizar({ id, ...campos }: Partial<DadosVacina> & { id: string }): VacinaCatalogo {
     return runInTransaction(this.banco, () => {
       const atual = this.catalogoObter(id);
@@ -60,6 +61,7 @@ export class VacinasService {
     });
   }
 
+  // esta função inativa uma vacina
   catalogoInativar(id: string): void {
     runInTransaction(this.banco, () => {
       this.catalogoObter(id);
@@ -68,7 +70,7 @@ export class VacinasService {
     });
   }
 
-  // a próxima dose é a data da aplicação + o intervalo de reforço da vacina
+  // esta função registra a aplicação e calcula a próxima dose
   aplicar(entrada: { animal_id: string; vacina_id: string; data: string; lote?: string }, usuarioId: string) {
     if (entrada.data > this.hoje()) throw new ErroNegocio('DADOS_INVALIDOS', 'A data da aplicação não pode ser no futuro.');
     return runInTransaction(this.banco, () => {
@@ -83,12 +85,13 @@ export class VacinasService {
     });
   }
 
-  /** vacinas que vencem de hoje até daqui a 3 dias */
+  // esta função lista as vacinas dos próximos 3 dias
   fila(): VacinaFila[] {
     const hoje = this.hoje();
     return this.repository.fila(hoje, somarDias(hoje, DIAS_DE_AVISO));
   }
 
+  // esta função marca o lembrete como enviado
   registrarLembrete(aplicacaoId: string): void {
     runInTransaction(this.banco, () => {
       const item = this.repository.itemDaFila(aplicacaoId);

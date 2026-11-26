@@ -1,4 +1,3 @@
-// respostas de mentira da trilha 4, pra testar as telas sem back-end (nada disso é gravado)
 import type { IPCResponse } from '../api.js';
 import { hojeEmSaoPaulo } from '../formatadores.js';
 import type { Endereco, Orcamento, ResumoInicio, Servico, VacinaCatalogo, VacinaFila } from '../tipos.js';
@@ -9,6 +8,7 @@ const ok = <T>(dados: T): IPCResponse<T> => ({ ok: true, dados });
 const erro = (codigo: string, mensagem: string): IPCResponse<never> => ({ ok: false, erro: { codigo, mensagem } });
 const pagina = <T>(itens: T[]) => ok({ itens, total: itens.length, pagina: 1, tamanho: 10 });
 
+// esta função devolve respostas de mentira pra testar as telas
 export function criarMockTrilha4(): Record<string, HandlerMockTrilha4> {
   const vacinas: VacinaCatalogo[] = [{ id: 'v1', nome: 'V10', intervalo_reforco_dias: 365, ativo: true }];
   const servicos: Servico[] = [{ id: 's1', nome: 'Consulta', valor_centavos: 15000, ativo: true }];

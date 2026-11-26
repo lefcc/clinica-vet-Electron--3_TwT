@@ -1,4 +1,3 @@
-// canais da trilha 4: confere os dados com o zod, o perfil, e chama o service
 import { BrowserWindow, dialog, net, shell } from 'electron';
 import {
   CepEntradaSchema, CobrancaSchema, CsvExportarEntradaSchema, CsvExportarSaidaSchema,
@@ -33,7 +32,7 @@ const MASTER: Perfil[] = ['MASTER'];
 const BALCAO: Perfil[] = ['MASTER', 'ATENDENTE'];
 const APLICAM_VACINA: Perfil[] = ['MASTER', 'VETERINARIO'];
 
-// pdf de verdade: janela escondida (sem javascript) + printToPDF + dialog de salvar
+// este objeto imprime o pdf e pergunta onde salvar
 const saidaPdfElectron: SaidaPdf = {
   async imprimir(html) {
     const janela = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true } });
@@ -56,6 +55,7 @@ export interface FontesTrilha4 {
   configuracoes: () => Configuracoes;
 }
 
+// esta função cria os serviços da trilha 4
 export function criarServicosTrilha4(banco: BancoSql, fontes: FontesTrilha4) {
   const outbox = new OutboxRepository(banco);
   const trilha3 = criarServicosTrilha3(banco);
@@ -80,7 +80,7 @@ export function criarServicosTrilha4(banco: BancoSql, fontes: FontesTrilha4) {
   };
 }
 
-// valida a entrada e a saída com os contratos do /shared
+// esta função registra um canal e valida os dados
 function registrar<E extends z.ZodTypeAny, S extends z.ZodTypeAny>(
   canal: string,
   perfis: Perfil[],
@@ -95,15 +95,14 @@ function registrar<E extends z.ZodTypeAny, S extends z.ZodTypeAny>(
   });
 }
 
+// esta função registra todos os canais
 export function registrarTrilha4Ipc(banco: BancoSql, fontes: FontesTrilha4): void {
   const s = criarServicosTrilha4(banco, fontes);
   const nada = SemEntradaSchema;
 
-  // painel
   registrar('dashboard:resumo', TODOS, nada, ResumoInicioSchema,
     (_d, sessao) => s.dashboard.resumo(sessao.perfil, sessao.usuarioId));
 
-  // cep e whatsapp
   registrar('cep:buscar', BALCAO, z.object({ cep: z.string() }).strict(), EnderecoSchema, ({ cep }) => {
     if (!CepEntradaSchema.safeParse({ cep }).success) throw new ErroNegocio('CEP_INVALIDO', 'O CEP precisa ter 8 números.');
     return s.cep.consultar(cep);
@@ -113,7 +112,6 @@ export function registrarTrilha4Ipc(banco: BancoSql, fontes: FontesTrilha4): voi
     return {};
   });
 
-  // vacinas
   registrar('vacinas:catalogo_listar', TODOS, EntradaListagemSchema, paginaSchema(VacinaCatalogoSchema), (d) => s.vacinas.catalogoListar(d));
   registrar('vacinas:catalogo_obter', TODOS, PorIdSchema, VacinaCatalogoSchema, ({ id }) => s.vacinas.catalogoObter(id));
   registrar('vacinas:catalogo_criar', MASTER, VacinaCriarSchema, VacinaCatalogoSchema, (d) => s.vacinas.catalogoCriar(d));
@@ -130,7 +128,6 @@ export function registrarTrilha4Ipc(banco: BancoSql, fontes: FontesTrilha4): voi
     return {};
   });
 
-  // serviços: atendente lê (pra montar orçamento), só o master escreve
   registrar('servicos:listar', BALCAO, EntradaListagemSchema, paginaSchema(ServicoSchema), (d) => s.servicos.listar(d));
   registrar('servicos:obter', BALCAO, PorIdSchema, ServicoSchema, ({ id }) => s.servicos.obter(id));
   registrar('servicos:criar', MASTER, ServicoCriarSchema, ServicoSchema, (d) => s.servicos.criar(d));
@@ -140,13 +137,11 @@ export function registrarTrilha4Ipc(banco: BancoSql, fontes: FontesTrilha4): voi
     return {};
   });
 
-  // orçamentos
   registrar('orcamentos:listar', BALCAO, EntradaListagemSchema, paginaSchema(OrcamentoSchema), (d) => s.orcamentos.listar(d));
   registrar('orcamentos:obter', BALCAO, PorIdSchema, OrcamentoSchema, ({ id }) => s.orcamentos.obter(id));
   registrar('orcamentos:criar', BALCAO, OrcamentoCriarSchema, OrcamentoSchema, (d) => s.orcamentos.criar(d));
   registrar('orcamentos:pdf', BALCAO, PorIdSchema, OrcamentoPdfSchema, ({ id }) => s.pdf.gerar(s.orcamentos.obter(id), s.configuracoes()));
 
-  // relatórios e csv (só master)
   registrar('relatorios:cobrancas', MASTER, nada, z.array(CobrancaSchema), () => s.relatorios.cobrancas());
   registrar('relatorios:estoque_validade', MASTER, nada, z.array(EstoqueValidadeSchema), () => s.relatorios.estoqueValidade());
   registrar('relatorios:lista_compras', MASTER, nada, z.array(ListaCompraSchema), () => s.relatorios.listaCompras());

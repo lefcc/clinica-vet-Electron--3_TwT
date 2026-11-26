@@ -1,4 +1,3 @@
-// pdf do orçamento: monta o html, imprime com printToPDF e salva onde a pessoa escolher
 import { writeFile } from 'node:fs/promises';
 import type { Configuracoes, Orcamento } from '@clinica-vet/shared';
 import { ErroNegocio } from '../../erros/erro-negocio';
@@ -8,13 +7,14 @@ export interface SaidaPdf {
   escolherArquivo(nomeSugerido: string): Promise<string | undefined>;
 }
 
-// nomes e descrições vêm do banco, então escapa antes de colocar no html
+// esta função protege o texto antes de ir pro html
 function escapar(texto: string): string {
   return texto.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 }
 
 const reais = (centavos: number) => (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+// esta função monta o html do orçamento
 export function montarHtmlOrcamento(orcamento: Orcamento, clinica: Configuracoes): string {
   const endereco = [clinica.logradouro, clinica.numero, clinica.bairro, clinica.cidade, clinica.uf].filter(Boolean).join(', ');
   const contato = [clinica.telefone, clinica.email].filter(Boolean).join(' · ');
@@ -51,7 +51,7 @@ export function montarHtmlOrcamento(orcamento: Orcamento, clinica: Configuracoes
 export class OrcamentoPdf {
   constructor(private readonly saida: SaidaPdf) {}
 
-  // igual na aula de arquivos: showSaveDialog e depois writeFile
+  // esta função salva o pdf
   async gerar(orcamento: Orcamento, clinica: Configuracoes): Promise<{ caminho: string }> {
     const caminho = await this.saida.escolherArquivo(`orcamento-${String(orcamento.numero).padStart(4, '0')}.pdf`);
     if (!caminho) throw new ErroNegocio('PDF_CANCELADO', 'Você cancelou a geração do PDF.');
