@@ -69,7 +69,8 @@ class Aplicacao {
       new EsquemaLocal(conexao).aplicar();
 
       const hash = new HashSenha(Math.max(10, config.bcryptCost));
-      const usuarios = new UsuarioRepository(conexao, config.sync.habilitado);
+      // A primeira conta de uma instalação também precisa sobreviver à configuração posterior do MySQL.
+      const usuarios = new UsuarioRepository(conexao, app.isPackaged || config.sync.habilitado);
 
       const dados = SeedUsuarioExemplo.escolherDados(config.usuarioExemplo, !app.isPackaged && !config.sync.habilitado);
       const resultado = await new SeedUsuarioExemplo(usuarios, hash).executar(dados);

@@ -6,11 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConexaoLocal } from '../db/local/conexao-local';
 import { EsquemaLocal } from '../db/local/esquema-local';
 import { HashSenha } from '../modules/auth/hash-senha';
+import { AuthService } from '../modules/auth/auth.service';
 import { OutboxRepository } from '../modules/admin/outbox.repository';
 import { UsuarioRepository } from '../modules/auth/usuario.repository';
 import { permitirOrigemIpc, sessoes } from './registry';
 import { criarTrilha1, registrarTrilha1 } from './trilha1.ipc';
 import { registrarEstadoSync } from './sync.ipc';
+import { AuthIpc } from './auth.ipc';
 import type { SyncStatus } from '../sync';
 
 type Resposta = { ok: true; dados: unknown } | { ok: false; erro: { codigo: string; mensagem: string } };
@@ -78,6 +80,21 @@ describe('Trilha 1 via registry IPC e SQLite', () => {
   function contar(tabela: 'auditoria' | 'sync_outbox' | 'colaboradores') {
     return (banco.prepare('SELECT COUNT(*) AS total FROM ' + tabela).get() as { total: number }).total;
   }
+
+  it('valida os contratos de login, consulta de sessão e saída', async () => {
+    const auth = new AuthService(new UsuarioRepository(banco), sessoes, hash, 60_000);
+    new AuthIpc(auth).registrar();
+    sessoes.definir(null);
+    const esperado = { usuarioId: masterId, nome: 'Admin', perfil: 'MASTER', expiraEm: expect.any(Number) };
+
+    expect(await invocar('auth:login', { login: 'admin', senha: 'senha-admin' })).toEqual({ ok: true, dados: esperado });
+    for (const canal of ['auth:sessao', 'auth:sair']) {
+      expect(await invocar(canal, {})).toMatchObject({ ok: false, erro: { codigo: 'DADOS_INVALIDOS' } });
+    }
+    expect(await invocar('auth:sessao')).toEqual({ ok: true, dados: esperado });
+    expect(await invocar('auth:sair')).toEqual({ ok: true, dados: {} });
+    expect(await invocar('auth:sessao')).toMatchObject({ ok: false, erro: { codigo: 'NAO_AUTENTICADO' } });
+  });
 
   it('consulta o estado local da fila sem MySQL e sem confundir uma fila vazia com sincronização', async () => {
     const estado: SyncStatus = { pendentes: 0, ultimaSync: null, emAndamento: false, erro: null };

@@ -5,6 +5,7 @@ import { mkdtemp, readdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as aguardar } from 'node:timers/promises';
 import puppeteer from 'puppeteer';
 
@@ -67,6 +68,15 @@ async function testarJanela(diretorio, variaveis, testar) {
   }
 }
 
+async function entrar(pagina, login, senha) {
+  const usuario = 'input[name="login"]';
+  await pagina.waitForSelector(usuario, { timeout: 10_000 });
+  await pagina.type(usuario, login);
+  await pagina.type('input[name="senha"]', senha);
+  await pagina.click('.login__form button[type="submit"]');
+  await pagina.waitForFunction(() => !document.querySelector('.login__form'), { timeout: 10_000 });
+}
+
 const login = 'qa_instalador';
 const senha = randomUUID();
 await testarJanela(
@@ -87,19 +97,64 @@ await testarJanela(
       downloadThroughput: 0,
       uploadThroughput: 0
     });
-    const usuario = 'input[name="login"]';
     await pagina.waitForFunction(() => !navigator.onLine, { timeout: 10_000 });
-    await pagina.type(usuario, login);
-    await pagina.type('input[name="senha"]', senha);
-    await pagina.click('.login__form button[type="submit"]');
-    await pagina.waitForFunction(() => !document.querySelector('.login__form'), { timeout: 10_000 });
+    await entrar(pagina, login, senha);
     const estado = await pagina.evaluate(() => window.api['sync:estado']());
     assert.equal(estado.ok, true);
     assert.equal(estado.dados.estado, 'local');
+    const banco = new DatabaseSync(join(perfil, 'clinica-vet.sqlite'), { readOnly: true });
+    try {
+      const iniciais = banco
+        .prepare('SELECT tabela FROM sync_outbox WHERE enviado_em IS NULL ORDER BY id LIMIT 2')
+        .all();
+      assert.deepEqual(
+        iniciais.map(({ tabela }) => tabela),
+        ['colaboradores', 'usuarios'],
+        'A primeira conta deve ficar na fila mesmo sem configurar o MySQL.'
+      );
+    } finally {
+      banco.close();
+    }
     const backup = await pagina.evaluate(() => window.api['backup:criar']());
     assert.equal(backup.ok, true);
     assert.ok((await readdir(join(perfil, 'backups'))).some((arquivo) => arquivo.endsWith('.sqlite')));
-    console.log('NSIS verificado em Windows sem instalação anterior: login MASTER e backup SQLite offline.');
+
+    const perfis = [
+      {
+        nome: 'Veterinária QA',
+        login: 'qa_veterinaria',
+        cpf: '11144477735',
+        cargo: 'Veterinária',
+        crmv: 'QA-123',
+        perfil: 'VETERINARIO',
+        senha: randomUUID()
+      },
+      {
+        nome: 'Atendente QA',
+        login: 'qa_atendente',
+        cpf: '39053344705',
+        cargo: 'Atendente',
+        perfil: 'ATENDENTE',
+        senha: randomUUID()
+      }
+    ];
+    for (const cadastro of perfis) {
+      const criado = await pagina.evaluate((dados) => window.api['colaboradores:criar'](dados), cadastro);
+      assert.equal(criado.ok, true);
+    }
+    for (const conta of perfis) {
+      await pagina.click('button.sair');
+      await entrar(pagina, conta.login, conta.senha);
+      const respostas = await pagina.evaluate(async () => ({
+        sessao: await window.api['auth:sessao'](),
+        backup: await window.api['backup:listar'](),
+        sincronizacao: await window.api['sync:estado']()
+      }));
+      assert.equal(respostas.sessao.dados.perfil, conta.perfil);
+      assert.equal(respostas.backup.erro?.codigo, 'SEM_PERMISSAO');
+      assert.equal(respostas.sincronizacao.dados.estado, 'local');
+    }
+    console.log('NSIS verificado em Windows limpo com os três perfis offline, fila inicial e backup do MASTER.');
   }
 );
 

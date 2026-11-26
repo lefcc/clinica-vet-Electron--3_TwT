@@ -1,4 +1,4 @@
-import { LoginEntradaSchema, type Sessao as SessaoDto } from '@clinica-vet/shared';
+import { LoginEntradaSchema, SessaoSchema, type Sessao as SessaoDto } from '@clinica-vet/shared';
 import { ErroNegocio } from '../../erros/erro-negocio';
 import type { HashSenha } from './hash-senha';
 import type { ArmazemSessao } from './sessao-em-memoria';
@@ -44,7 +44,7 @@ export class AuthService {
     if (!atual || atual.id !== usuario.id || atual.senhaHash !== usuario.senhaHash) {
       throw new ErroNegocio('CREDENCIAIS_INVALIDAS', 'Usuário ou senha inválidos.');
     }
-    const sessao: SessaoDto = { usuarioId: atual.id, nome: atual.nome, perfil: atual.perfil, expiraEm: Date.now() + this.duracaoSessaoMs };
+    const sessao = SessaoSchema.parse({ usuarioId: atual.id, nome: atual.nome, perfil: atual.perfil, expiraEm: Date.now() + this.duracaoSessaoMs });
     const registrarLogin = () => this.usuarios.registrarLogin(atual.id);
     if (this.auditoria) this.auditoria.executar('LOGIN', sessao, registrarLogin);
     else registrarLogin();
@@ -60,7 +60,7 @@ export class AuthService {
       this.sessoes.definir(null);
       throw new ErroNegocio('SESSAO_EXPIRADA', 'Sua sessão expirou. Entre novamente.');
     }
-    return { usuarioId: sessao.usuarioId, nome: sessao.nome ?? '', perfil: sessao.perfil, expiraEm: sessao.expiraEm };
+    return SessaoSchema.parse({ usuarioId: sessao.usuarioId, nome: sessao.nome, perfil: sessao.perfil, expiraEm: sessao.expiraEm });
   }
 
   sair(): void {

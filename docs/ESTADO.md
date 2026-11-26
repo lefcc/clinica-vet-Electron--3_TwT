@@ -6,7 +6,7 @@
 ## 1. Status Geral
 - **Arquitetura ativa:** Offline-First — Electron (`main` em TypeScript + IPC + `preload.ts`) + Front HTML/CSS/TS puro (Vite) + SQLite local (`better-sqlite3` + Drizzle) + Sincronização com MySQL 8 em nuvem (`mysql2` + Drizzle).
 - **Fase atual:** Semana 1 — Fundação (Dias 1–7).
-- **Última atualização:** 25/11/2026 (entrega da Trilha 1 na branch `feat/trilha1-dev-a`).
+- **Última atualização:** 25/11/2026 (Trilha 1 incorporada à `main` via PR #3).
 
 ---
 
@@ -21,7 +21,7 @@
 - [ ] **1.6 (Dev B)** Contratos, handlers IPC e telas de `clientes` e `animais`
 - [ ] **1.7 (Dev D)** Busca ViaCEP no `main` (`cep:buscar`) + componente `CepInput` com fallback offline
 - [ ] **1.8 (Dev C)** Contratos, migration, handlers IPC e telas de `medicamentos` e `fornecedores`
-- [x] **1.9 (Dev A)** CRUD de `colaboradores` (MASTER) + integração na branch de entrega
+- [x] **1.9 (Dev A)** CRUD de `colaboradores` (MASTER) + integração à `main`
 
 ### Semana 2 — Núcleo Clínico e Sync v1
 - [x] **2.1 (Dev A)** Schema/migrations MySQL central + conexão TLS + `safeStorage`
@@ -52,15 +52,22 @@
 - [ ] **4.6 (Dev D)** Polimento de UX, atalhos e teste com usuário leigo
 - [ ] **4.7 (Todos)** QA ponta a ponta (3 perfis, 2+ PCs, offline/online), manual curto, README e entrega
 
-Os itens do Dev A estão no [PR #3](https://github.com/lefcc/clinica-vet-Electron--3_TwT/pull/3), para revisão cruzada antes do merge. O [guia de sincronização e instalação](SINCRONIZACAO.md) reúne o provisionamento e os comandos de validação.
+O [PR #3](https://github.com/lefcc/clinica-vet-Electron--3_TwT/pull/3) integrou os itens do Dev A à `main`. O [guia de sincronização e instalação](SINCRONIZACAO.md) reúne o provisionamento e os comandos de validação. O aceite de ponta a ponta do produto no item 4.7 depende dos módulos de todas as trilhas e da validação do grupo.
 
 ---
 
 ## 3. Contratos publicados em `/shared`
-_(Nenhum código criado ainda — registrar aqui conforme forem mergeados na Semana 1)_
+O pacote `@clinica-vet/shared` publica perfis, sessão e login, o formato de resposta IPC, paginação, schemas de domínio e os contratos administrativos de `canaisTrilha1`. O [índice de exportações](../shared/src/index.ts) indica os arquivos por área.
 
 ## 4. Canais IPC registrados (`preload.ts` ↔ `main`)
-_(Nenhum canal criado ainda — registrar aqui no formato `modulo:acao` + perfis permitidos)_
+| Canais registrados na `main` | Perfis |
+| --- | --- |
+| `auth:login`, `auth:sessao`, `auth:sair` | Origem Electron autorizada. Sessão avaliada no módulo de autenticação. |
+| `colaboradores:listar`, `colaboradores:obter`, `colaboradores:criar`, `colaboradores:atualizar`, `colaboradores:inativar`, `colaboradores:redefinir_senha` | MASTER |
+| `auditoria:listar`, `configuracoes:atualizar` | MASTER |
+| `backup:listar`, `backup:criar`, `backup:restaurar`, `sync_conflitos:listar`, `sync_conflitos:resolver` | MASTER |
+| `configuracoes:obter` | MASTER recebe todos os dados. VETERINARIO e ATENDENTE recebem o modelo de lembrete. |
+| `sync:estado` | Todos os perfis autenticados |
 
 ## 5. Migrations aplicadas (ordem oficial controlada pelo Dev A)
 - **SQLite local (`app/src/main/db/local/migrations`):** `0000_inicial.sql`, aplicada na abertura do aplicativo.
