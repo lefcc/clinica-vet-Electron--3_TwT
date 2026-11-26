@@ -93,6 +93,8 @@ pnpm dev
 
 O contêiner MySQL aplica as migrations centrais na criação de um volume vazio. As instruções para sincronização, credenciais e instalador Windows estão no [guia da Trilha 1](docs/SINCRONIZACAO.md).
 
+Para entrar, trabalhar offline e fazer ou restaurar uma cópia de segurança, consulte o [manual rápido com imagens](docs/MANUAL-TRILHA1.md).
+
 ## Rodando só o app (front + login de exemplo) no Windows
 
 Passo a passo testado para abrir o app sem MySQL/Docker. Só precisa do Node 20+.

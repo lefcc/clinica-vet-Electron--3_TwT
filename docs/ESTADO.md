@@ -52,7 +52,7 @@
 - [ ] **4.6 (Dev D)** Polimento de UX, atalhos e teste com usuário leigo
 - [ ] **4.7 (Todos)** QA ponta a ponta (3 perfis, 2+ PCs, offline/online), manual curto, README e entrega
 
-O [PR #3](https://github.com/lefcc/clinica-vet-Electron--3_TwT/pull/3) integrou os itens do Dev A à `main`. O [guia de sincronização e instalação](SINCRONIZACAO.md) reúne o provisionamento e os comandos de validação. O aceite de ponta a ponta do produto no item 4.7 depende dos módulos de todas as trilhas e da validação do grupo.
+O [PR #3](https://github.com/lefcc/clinica-vet-Electron--3_TwT/pull/3) integrou os itens do Dev A à `main`. O [guia de sincronização e instalação](SINCRONIZACAO.md) reúne o provisionamento e os comandos de validação. O [manual rápido da Trilha 1](MANUAL-TRILHA1.md) reúne as telas e o roteiro de conferência em dois computadores. O aceite de ponta a ponta do produto no item 4.7 depende dos módulos de todas as trilhas e da validação do grupo.
 
 ---
 
